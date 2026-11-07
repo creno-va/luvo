@@ -1,45 +1,20 @@
 ---
-const layers = [
-  ['web', 'Astro · Cloudflare Workers'],
-  ['api', 'Hono · Cloudflare Workers'],
-  ['db', 'Drizzle · Cloudflare D1'],
-];
+import LuvoApp from '@/components/LuvoApp';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+import '@/styles/global.css';
 ---
-
 <!doctype html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Luvo 웹 서비스" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="처방전 한 장과 매일의 투약 체크. 우리 아이와 오래 함께하기 위한 작은 건강 기록, Luvo." />
+    <meta name="theme-color" content="#f6f8fb" />
     <title>Luvo</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
-    <main>
-      <p class="eyebrow">luvo.baro.site</p>
-      <h1>Luvo</h1>
-      <p>웹 서비스의 시작점입니다.</p>
-      <dl>
-        {layers.map(([name, stack]) => <div><dt>{name}</dt><dd>{stack}</dd></div>)}
-      </dl>
-      <nav aria-label="상태 확인">
-        <a href="/api/health">API 상태</a>
-        <a href="/api/health/db">DB 연결 상태</a>
-      </nav>
-    </main>
+    <LuvoApp client:only="react"><div slot="fallback" class="initial-loading">우리 아이의 기록을 준비하고 있어요…</div></LuvoApp>
+    <noscript>투약 기록을 사용하려면 브라우저의 JavaScript를 켜주세요.</noscript>
   </body>
 </html>
-
-<style>
-  :global(html) { font-family: system-ui, sans-serif; color: #1e293b; background: #f8fafc; }
-  :global(body) { margin: 0; }
-  main { max-width: 38rem; margin: 16vh auto; padding: 1.5rem; }
-  .eyebrow { color: #64748b; font-size: 0.875rem; }
-  h1 { margin: 0; font-size: clamp(3rem, 10vw, 5rem); letter-spacing: -0.05em; }
-  dl { margin: 2.5rem 0; }
-  dl div { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid #e2e8f0; }
-  dt { min-width: 2.5rem; font-weight: 600; }
-  dd { margin: 0; color: #475569; }
-  nav { display: flex; flex-wrap: wrap; gap: 1.5rem; }
-  a { color: #4338ca; text-underline-offset: 0.2em; }
-</style>

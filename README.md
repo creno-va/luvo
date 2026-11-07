@@ -1,6 +1,15 @@
 # Luvo
 
-Astro + Hono + Drizzle로 구성한 Cloudflare 기반 웹 서비스 스캐폴딩.
+처방전 사진과 시간대별 투약 체크로 건강 기록을 남기는 강아지 케어 프로토타입.
+
+로그인 없이 기록과 원본 사진을 브라우저 IndexedDB에 저장합니다. 약별 토글은 미복용 기간을 기록하며, 처방 이력과 실제 투약 체크를 따로 유지합니다. 첫 화면의 **샘플로 둘러보기**로 기능을 체험할 수 있습니다.
+
+- UI: Astro + React, Pretendard 자체 호스팅, Lucide, shadcn 패턴의 Radix UI 컴포넌트와 Tailwind CSS.
+- 레이아웃: 데스크톱은 왼쪽 탐색·오늘 투약·약 요약, 모바일은 하단 탐색과 한 열의 체크 목록.
+- 사진: JPG/PNG/WebP, 원본 최대 12MB. 분석용으로 크기를 조정하여 Hono API → Cloudflare AI Gateway → Workers AI로 전송합니다.
+- 읽힌 처방이 명확하면 자동 반영하고, 불명확한 날짜·용량·투약 시간은 확인받습니다. 분석 실패 시 원본과 함께 직접 입력할 수 있습니다.
+- 샘플과 실제 기록은 섞지 않습니다. 첫 실제 문서 등록 시 샘플을 정리합니다.
+- 브라우저 데이터 삭제 시 기록도 삭제되며 기기 간 동기화는 없습니다.
 
 ```text
 apps/web      Astro 정적 웹 + API 게이트웨이 Worker (luvo-web)
@@ -35,6 +44,7 @@ Astro 개발 서버는 `/api` 요청을 로컬 Hono Worker로 전달합니다.
 
 ```sh
 npm run check     # Wrangler 바인딩 타입 생성 + 전체 타입 검사
+npm test          # 처방 이력, 미복용 기간, 회차별 체크의 도메인 테스트
 npm run build     # Astro 정적 빌드
 npm run preview   # 두 Worker를 Wrangler에서 함께 실행 (4321 포트)
 ```
@@ -113,5 +123,9 @@ npm run smoke
 ```
 
 `/api/health/db`는 Drizzle로 실제 D1 테이블을 조회하며 DB 또는 마이그레이션에 문제가 있으면 503을 반환합니다.
-아직 서비스 기능, 인증, 비즈니스 테이블은 구현하지 않았습니다.
+건강 기록은 D1·R2에 저장하지 않습니다. D1은 기존 연결 확인용으로 유지합니다.
+AI는 `apps/api/wrangler.jsonc`의 AI 바인딩과 `AI_GATEWAY_ID`(현재 `default`)를 사용합니다.
+개발 중에도 사진 분석은 원격 Workers AI를 호출하므로 Wrangler 로그인이 필요합니다.
+분석 요청은 Gateway 캐시와 로그 수집을 끄며, API는 사진·추출 결과를 로그로 남기지 않습니다.
+분석 API에는 IP별 분당 5회 제한을 적용했습니다. 모델 결과는 원본과 비교하여 수정할 수 있습니다.
 비밀값이 필요해지면 로컬은 `apps/api/.dev.vars`, 운영은 `npx wrangler secret put NAME --config apps/api/wrangler.jsonc`를 사용합니다.

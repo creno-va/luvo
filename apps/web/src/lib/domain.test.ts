@@ -1,0 +1,132 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  applyPrescription,
+  doseKey,
+  emptyState,
+  isPrescribed,
+  pausedAt,
+  revisionAt,
+  scheduleFor,
+  toggleCheck,
+  toggleMedication,
+  validateItems,
+  type DocumentRecord,
+} from "./domain.ts";
+
+const date = "2026-11-07";
+const localISO = (time: string) => new Date(`${date}T${time}:00`).toISOString();
+function document(
+  fingerprint = "first",
+  startDate = date,
+  dose = "1회 1정",
+): DocumentRecord {
+  return {
+    id: fingerprint,
+    fingerprint,
+    filename: "test.png",
+    date: startDate,
+    clinic: "테스트 병원",
+    diagnosis: "",
+    summary: "",
+    createdAt: "2026-11-07T00:00:00Z",
+    items: [
+      {
+        name: "약 A",
+        dose,
+        times: ["08:00", "20:00"],
+        startDate,
+        endDate: "2026-11-14",
+        instructions: "",
+        action: "prescribe",
+      },
+    ],
+  };
+}
+test("an earlier prescription uploaded later does not replace the current prescription", () => {
+  let s = applyPrescription(emptyState(), document("new", date, "2정"));
+  s = applyPrescription(s, document("old", "2026-11-01", "1정"));
+  assert.equal(s.medications.length, 1);
+  assert.equal(revisionAt(s.medications[0], date)?.dose, "2정");
+  assert.equal(revisionAt(s.medications[0], "2026-11-03")?.dose, "1정");
+});
+test("pause and resume record an interval and preserve the prescription", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  s = toggleMedication(s, id, localISO("09:00"));
+  assert.equal(pausedAt(s.medications[0], localISO("08:00")), false);
+  assert.equal(pausedAt(s.medications[0], localISO("20:00")), true);
+  s = toggleMedication(s, id, localISO("19:00"));
+  assert.equal(pausedAt(s.medications[0], localISO("18:00")), true);
+  assert.equal(pausedAt(s.medications[0], localISO("20:00")), false);
+  assert.equal(s.medications[0].revisions.length, 1);
+});
+test("a new prescription preserves an open pause", () => {
+  let s = applyPrescription(emptyState(), document());
+  s = toggleMedication(s, s.medications[0].id, localISO("09:00"));
+  s = applyPrescription(s, document("changed", date, "3정"));
+  assert.equal(s.medications[0].pauses[0].end, null);
+  assert.equal(revisionAt(s.medications[0], date)?.dose, "3정");
+});
+test("missing medications in a new document are not implicitly stopped", () => {
+  let s = applyPrescription(emptyState(), document());
+  const next = document("other");
+  next.items[0].name = "약 B";
+  s = applyPrescription(s, next);
+  assert.equal(s.medications.filter((m) => isPrescribed(m, date)).length, 2);
+});
+test("expired prescriptions are excluded even after the toggle is resumed", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  s = toggleMedication(s, id, localISO("09:00"));
+  s = toggleMedication(s, id, "2026-11-20T09:00:00Z");
+  assert.equal(isPrescribed(s.medications[0], "2026-11-20"), false);
+  assert.equal(scheduleFor(s, "2026-11-20").length, 0);
+});
+test("duplicate uploads do not create duplicate documents or revisions", () => {
+  const s = applyPrescription(emptyState(), document());
+  assert.throws(() => applyPrescription(s, document()), /이미 등록/);
+  assert.equal(s.documents.length, 1);
+  assert.equal(s.medications[0].revisions.length, 1);
+});
+test("dose checks are scoped to medication, local date, and scheduled time", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  s = toggleCheck(s, doseKey(id, date, "08:00"), localISO("08:03"));
+  assert.ok(scheduleFor(s, date)[0].checkedAt);
+  assert.equal(scheduleFor(s, date)[1].checkedAt, undefined);
+  assert.equal(scheduleFor(s, "2026-11-08")[0].checkedAt, undefined);
+  s = toggleCheck(s, doseKey(id, date, "08:00"));
+  assert.equal(Object.keys(s.checks).length, 0);
+});
+test("pause does not discard completed doses or rewrite historical checks", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  s = toggleCheck(s, doseKey(id, date, "08:00"), localISO("08:03"));
+  s = toggleMedication(s, id, localISO("09:00"));
+  const items = scheduleFor(s, date);
+  assert.ok(items[0].checkedAt);
+  assert.equal(items[0].paused, false);
+  assert.equal(items[1].paused, true);
+});
+test("invalid dates and missing times need review instead of automatic application", () => {
+  const d = document();
+  d.items[0].startDate = "2026-02-30";
+  assert.match(validateItems(d.items)!, /날짜/);
+  d.items[0].startDate = date;
+  d.items[0].times = [];
+  assert.match(validateItems(d.items)!, /시간/);
+});
+test("a diagnosis document can be recorded without creating a medication", () => {
+  const doc = document();
+  doc.items = [];
+  doc.diagnosis = "처방이 없는 진료 메모";
+  const s = applyPrescription(emptyState(), doc);
+  assert.equal(s.documents.length, 1);
+  assert.equal(s.medications.length, 0);
+});
+test("repeated medication names need review instead of losing one dose plan", () => {
+  const doc = document();
+  doc.items.push({ ...doc.items[0], dose: "2정", times: ["20:00"] });
+  assert.match(validateItems(doc.items)!, /같은 이름/);
+});

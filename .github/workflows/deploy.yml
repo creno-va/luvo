@@ -39,6 +39,9 @@ jobs:
       - name: Check types
         run: npm run check
 
+      - name: Test prescription and dose history
+        run: npm test
+
       - name: Check committed migrations match the schema
         run: |
           npm run db:generate

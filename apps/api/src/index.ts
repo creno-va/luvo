@@ -1,10 +1,12 @@
 import { createDb, appMetadata } from '@luvo/db';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
+import { prescriptions } from './prescriptions';
 
 const app = new Hono<{ Bindings: ApiBindings }>();
 
 app.use('*', secureHeaders());
+app.route('/api/prescriptions', prescriptions);
 
 app.get('/api', (c) => c.json({ name: 'luvo-api', version: '0.0.0' }));
 
