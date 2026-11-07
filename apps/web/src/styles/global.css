@@ -1001,23 +1001,19 @@ img {
 }
 .primary-action {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  place-items: center;
   gap: 8px;
+  padding: 12px 20px;
   min-height: 56px;
   border-radius: 13px;
   background: var(--accent);
   color: #0f2f1b;
   font-size: 14px;
   font-weight: 700;
+  text-align: center;
   box-shadow: 0 6px 16px #00b95c12;
-}
-.primary-action > svg:last-child {
-  margin-left: auto;
-}
-.primary-action > svg:first-child {
-  margin-right: auto;
 }
 .primary-action:hover {
   background: #00e680;
@@ -2725,7 +2721,7 @@ img {
     color: #9db18c;
   }
   .primary-action {
-    max-width: 410px;
+    max-width: 520px;
   }
   .care-toast {
     bottom: 101px;
