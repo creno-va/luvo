@@ -344,6 +344,7 @@ export function DocumentUpload({
     >
       <DialogContent
         variant="sheet"
+        scrollResetKey={`${step}:${draft?.fingerprint ?? ""}`}
         className={cn("upload-dialog", step === "review" && "review-dialog")}
       >
         <div className="modal-icon">
