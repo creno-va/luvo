@@ -10,7 +10,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import "@/styles/landing-demo.css";
 export function DocumentOnboarding({
   onUpload,
   onSample,
