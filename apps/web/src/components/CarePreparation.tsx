@@ -24,7 +24,11 @@ export function CarePreparation({
         {cards.map((card) => (
           <li key={card.id}>
             <strong>{card.title}</strong>
-            <p>{card.actions.join(" ")}</p>
+            <ul className="personal-care-actions">
+              {card.actions.map((action) => (
+                <li key={action}>{action}</li>
+              ))}
+            </ul>
             {card.contact && (
               <p className="personal-care-contact">{card.contact}</p>
             )}

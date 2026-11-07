@@ -363,3 +363,15 @@
   margin-top: 6px;
   flex-wrap: wrap;
 }
+
+.personal-care-actions {
+  list-style: disc;
+  padding-left: 18px;
+  margin: 8px 0;
+}
+.personal-care-actions > li {
+  padding-left: 3px;
+  margin: 6px 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
