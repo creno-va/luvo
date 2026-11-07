@@ -18,6 +18,7 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Search,
   Sparkles,
   X,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import {
 import { DocumentUpload, type Draft } from "./DocumentUpload";
 import { DocumentOnboarding } from "./DocumentOnboarding";
 import { useHealthAnalysis } from "./HealthBriefing";
+import { MedicationResearch } from "./MedicationResearch";
 import {
   emptyState,
   isPrescribed,
@@ -57,10 +59,19 @@ import { readFile, readState, writeState } from "@/lib/storage";
 import { documentDateLabel, timelineEntries } from "@/lib/chronology";
 import { healthPeriods } from "@/lib/periods";
 
-type View = "home" | "dogs" | "timeline" | "welcome";
+type View = "home" | "dogs" | "timeline" | "welcome" | "medication";
 const viewFromUrl = (): View => {
   const v = new URLSearchParams(location.search).get("view");
-  return v === "dogs" || v === "timeline" || v === "welcome" ? v : "home";
+  return v === "dogs" ||
+    v === "timeline" ||
+    v === "welcome" ||
+    v === "medication"
+    ? v
+    : "home";
+};
+const researchTarget = () => {
+  const query = new URLSearchParams(location.search);
+  return { petId: query.get("pet"), medId: query.get("med") };
 };
 const readableDate = (date: string) =>
   new Date(`${date}T12:00:00`).toLocaleDateString("ko-KR", {
@@ -80,6 +91,7 @@ export default function LuvoApp() {
   const [store, setStore] = useState<Household | null>(null);
   const [fatal, setFatal] = useState("");
   const [view, setView] = useState<View>(viewFromUrl);
+  const [research, setResearch] = useState(researchTarget);
   const [date, setDate] = useState(localDate());
   const [calendar, setCalendar] = useState(false);
   const [upload, setUpload] = useState(false);
@@ -107,7 +119,10 @@ export default function LuvoApp() {
           ),
         );
     void load();
-    const onPop = () => setView(viewFromUrl());
+    const onPop = () => {
+      setView(viewFromUrl());
+      setResearch(researchTarget());
+    };
     window.addEventListener("popstate", onPop);
     if (typeof BroadcastChannel !== "undefined") {
       channel.current = new BroadcastChannel("luvo-records");
@@ -129,11 +144,19 @@ export default function LuvoApp() {
     const timer = setTimeout(() => setToast(""), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
-  function navigate(next: View) {
+  function navigate(next: View, medId?: string) {
     const url = new URL(location.href);
     if (next === "home") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
+    if (next === "medication" && medId && pet) {
+      url.searchParams.set("med", medId);
+      url.searchParams.set("pet", pet.id);
+    } else {
+      url.searchParams.delete("med");
+      url.searchParams.delete("pet");
+    }
     history.pushState({ luvoPage: true }, "", url);
+    setResearch(researchTarget());
     setView(next);
   }
   function back() {
@@ -255,6 +278,30 @@ export default function LuvoApp() {
         <p>우리 아이의 기록을 준비하고 있어요</p>
       </main>
     );
+  if (view === "medication") {
+    const owner = store.pets.find((p) => p.id === research.petId);
+    const med = owner?.medications.find((m) => m.id === research.medId);
+    const plan = med && (revisionAt(med, date) ?? med.revisions.at(-1));
+    return (
+      <div className="care-app">
+        {plan ? (
+          <MedicationResearch
+            key={`${owner!.id}:${med!.id}`}
+            medication={plan}
+            onBack={back}
+          />
+        ) : (
+          <main className="boot-screen">
+            <Pill size={30} />
+            <h1>이 약의 기록을 찾지 못했어요</h1>
+            <Button onClick={() => navigate("home")}>
+              내 기록으로 돌아가기
+            </Button>
+          </main>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="care-app">
       {!pet || view === "welcome" ? (
@@ -341,6 +388,7 @@ export default function LuvoApp() {
                       pet={pet}
                       date={date}
                       saving={saving}
+                      onResearch={(id) => navigate("medication", id)}
                       onToggle={async (id) => {
                         if (await mutate((p) => toggleMedication(p, id)))
                           setToast("복용 여부와 쉰 기간을 기록했어요.");
@@ -773,12 +821,14 @@ function MedicationList({
   saving,
   onToggle,
   onCheck,
+  onResearch,
 }: {
   pet: AppState;
   date: string;
   saving: boolean;
   onToggle: (id: string) => Promise<void>;
   onCheck: (key: string) => Promise<void>;
+  onResearch: (id: string) => void;
 }) {
   const rows = scheduleFor(pet, date);
   const medications = pet.medications.filter(
@@ -833,7 +883,17 @@ function MedicationList({
                   <Pill size={22} />
                 </span>
                 <div>
-                  <h3>{med.name}</h3>
+                  <div className="med-name-row">
+                    <h3>{med.name}</h3>
+                    <button
+                      className="med-search-button"
+                      onClick={() => onResearch(med.id)}
+                      aria-label={`${med.name} 약 정보 검색`}
+                    >
+                      <Search size={13} />
+                      <span>검색</span>
+                    </button>
+                  </div>
                   <p>
                     {plan.dose}
                     {plan.instructions ? ` · ${plan.instructions}` : ""}
