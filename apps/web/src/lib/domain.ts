@@ -24,6 +24,36 @@ export type DocumentRecord = {
   createdAt: string;
   items: PrescriptionItem[];
   sample?: boolean;
+  animal?: AnimalInfo;
+  conditions?: ConditionEntry[];
+};
+export type AnimalInfo = {
+  name: string;
+  breed: string;
+  sex: string;
+  age: string;
+  birthDate: string;
+};
+export type ConditionEntry = {
+  name: string;
+  status: "diagnosed" | "suspected" | "resolved" | "history";
+  note: string;
+};
+export type HealthBriefing = {
+  summary: string;
+  current: { text: string; sourceIds: string[] }[];
+  watch: {
+    title: string;
+    possibility: string;
+    prepare: string;
+    sourceIds: string[];
+    referenceIds: string[];
+  }[];
+  questions: string[];
+  unknowns: string[];
+  contextHash: string;
+  generatedAt: string;
+  references: { id: string; title: string; url: string }[];
 };
 export type Activity = {
   id: string;
@@ -35,12 +65,35 @@ export type Activity = {
 };
 export type AppState = {
   version: 1;
-  profile: { name: string; detail: string };
+  id: string;
+  revision: number;
+  profile: {
+    name: string;
+    detail: string;
+    breed?: string;
+    sex?: string;
+    age?: string;
+    birthDate?: string;
+    asOf?: string;
+  };
   medications: Medication[];
   documents: DocumentRecord[];
   checks: Record<string, string>;
+  doseSnapshots?: Record<
+    string,
+    {
+      name: string;
+      dose: string;
+      documentId: string;
+      date: string;
+      time: string;
+    }
+  >;
   activities: Activity[];
   sample: boolean;
+  briefing?: HealthBriefing;
+  briefingError?: string;
+  analysisConsent?: boolean;
 };
 export type Extraction = {
   clinic: string;
@@ -49,10 +102,14 @@ export type Extraction = {
   summary: string;
   medications: PrescriptionItem[];
   warnings: string[];
+  animal: AnimalInfo;
+  conditions: ConditionEntry[];
 };
 
 export const emptyState = (): AppState => ({
   version: 1,
+  id: uid(),
+  revision: 0,
   profile: { name: "우리 아이", detail: "함께 쌓아가는 건강 기록" },
   medications: [],
   documents: [],
@@ -116,6 +173,7 @@ export function toggleMedication(
   };
   return {
     ...state,
+    revision: state.revision + 1,
     medications: state.medications.map((m) => (m.id === id ? updated : m)),
     activities: [
       {
@@ -137,35 +195,75 @@ export function toggleCheck(
   now = new Date().toISOString(),
 ): AppState {
   const checks = { ...state.checks };
-  if (checks[key]) delete checks[key];
-  else checks[key] = now;
-  return { ...state, checks };
+  const doseSnapshots = { ...state.doseSnapshots };
+  if (checks[key]) {
+    delete checks[key];
+    delete doseSnapshots[key];
+  } else {
+    checks[key] = now;
+    const [id, date, time] = key.split("|");
+    const med = state.medications.find((m) => m.id === id);
+    const plan = med && date ? revisionAt(med, date) : undefined;
+    if (med && plan)
+      doseSnapshots[key] = {
+        name: med.name,
+        dose: plan.dose,
+        documentId: plan.documentId,
+        date,
+        time,
+      };
+  }
+  return { ...state, checks, doseSnapshots, revision: state.revision + 1 };
 }
 export function scheduleFor(state: AppState, date: string) {
-  return state.medications
-    .flatMap((med) => {
-      const r = revisionAt(med, date);
-      if (!r || !isPrescribed(med, date)) return [];
-      return r.times.map((time) => {
-        const key = doseKey(med.id, date, time);
-        const paused = pausedAt(
-          med,
-          new Date(`${date}T${time}:00`).toISOString(),
-        );
-        return {
-          key,
-          med,
-          revision: r,
-          time,
-          checkedAt: state.checks[key],
-          paused,
-        };
-      });
-    })
-    .sort(
-      (a, b) =>
-        a.time.localeCompare(b.time) || a.med.name.localeCompare(b.med.name),
+  const rows = state.medications.flatMap((med) => {
+    const r = revisionAt(med, date);
+    if (!r || !isPrescribed(med, date)) return [];
+    return r.times.map((time) => {
+      const key = doseKey(med.id, date, time);
+      const paused = pausedAt(
+        med,
+        new Date(`${date}T${time}:00`).toISOString(),
+      );
+      return {
+        key,
+        med,
+        revision:
+          state.checks[key] && state.doseSnapshots?.[key]
+            ? { ...r, dose: state.doseSnapshots[key].dose }
+            : r,
+        time,
+        checkedAt: state.checks[key],
+        paused,
+      };
+    });
+  });
+  // A later prescription can remove a time slot, but never a completed dose.
+  for (const [key, snapshot] of Object.entries(state.doseSnapshots ?? {})) {
+    if (
+      snapshot.date !== date ||
+      !state.checks[key] ||
+      rows.some((r) => r.key === key)
+    )
+      continue;
+    const med = state.medications.find((m) => m.id === key.split("|")[0]);
+    const revision = med?.revisions.find(
+      (r) => r.documentId === snapshot.documentId,
     );
+    if (med && revision)
+      rows.push({
+        key,
+        med,
+        revision: { ...revision, dose: snapshot.dose },
+        time: snapshot.time,
+        checkedAt: state.checks[key],
+        paused: false,
+      });
+  }
+  return rows.sort(
+    (a, b) =>
+      a.time.localeCompare(b.time) || a.med.name.localeCompare(b.med.name),
+  );
 }
 export function validateItems(items: PrescriptionItem[]): string | null {
   if (
@@ -201,7 +299,7 @@ export function applyPrescription(
     throw new Error("이미 등록한 문서예요. 진료 기록에서 확인할 수 있어요.");
   const error = validateItems(doc.items);
   if (error) throw new Error(error);
-  if (!doc.items.length && !doc.diagnosis.trim())
+  if (!doc.items.length && !doc.diagnosis.trim() && !doc.animal?.name)
     throw new Error("약이 없는 진단서는 진료 내용을 입력해 주세요.");
   const medications = structuredClone(state.medications);
   for (const item of doc.items) {
@@ -226,6 +324,23 @@ export function applyPrescription(
   }
   return {
     ...state,
+    revision: state.revision + 1,
+    profile:
+      doc.animal && (!state.profile.asOf || doc.date >= state.profile.asOf)
+        ? {
+            ...state.profile,
+            ...Object.fromEntries(
+              Object.entries(doc.animal).filter(([, value]) => value.trim()),
+            ),
+            asOf: doc.date,
+            detail: profileDetail({
+              ...state.profile,
+              ...Object.fromEntries(
+                Object.entries(doc.animal).filter(([, value]) => value.trim()),
+              ),
+            }),
+          }
+        : state.profile,
     medications,
     documents: [doc, ...state.documents],
     activities: [
@@ -240,6 +355,12 @@ export function applyPrescription(
       ...state.activities,
     ],
   };
+}
+export function profileDetail(profile: AppState["profile"]): string {
+  return (
+    [profile.breed, profile.sex, profile.age].filter(Boolean).join(" · ") ||
+    "문서에서 건강 기록을 이어가요"
+  );
 }
 export function sampleState(now = new Date()): AppState {
   const date = localDate(now);

@@ -1,0 +1,921 @@
+.onboarding-shell {
+  min-height: 100dvh;
+  background: linear-gradient(150deg, #f8fbff, #f6f8fb 60%, #eff5ff);
+}
+.document-onboarding {
+  max-width: 1170px;
+  padding: 32px 42px 0;
+  margin: auto;
+  letter-spacing: -0.03em;
+}
+.document-onboarding > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.document-onboarding > header > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: #8b97a8;
+  font-size: 12px;
+}
+.onboarding-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  align-items: center;
+  gap: 65px;
+  min-height: 570px;
+  padding: 55px 12px;
+}
+.onboarding-copy h1 {
+  font-size: 49px;
+  line-height: 1.32;
+  font-weight: 760;
+  letter-spacing: -2px;
+  margin: 22px 0;
+}
+.onboarding-copy > p {
+  color: #7b8798;
+  font-size: 16px;
+  line-height: 1.9;
+  margin-bottom: 32px;
+}
+.onboarding-copy > .sample-link {
+  padding-left: 0;
+  margin-top: 17px !important;
+}
+.onboarding-privacy {
+  display: flex;
+  gap: 6px;
+  color: #95a3b6;
+  font-size: 11px;
+  align-items: flex-start;
+  margin-top: 17px;
+  max-width: 350px;
+  line-height: 1.7;
+}
+.onboarding-privacy > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.onboarding-preview {
+  position: relative;
+  min-height: 390px;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 0 8px;
+}
+.onboarding-paper {
+  width: 225px;
+  height: 230px;
+  padding: 25px;
+  background: #fff;
+  border: 1px solid #e5edf9;
+  border-radius: 21px;
+  transform: rotate(-9deg);
+  position: absolute;
+  top: -6px;
+  left: 12px;
+  box-shadow: 0 15px 40px #427acb0d;
+}
+.onboarding-paper > span {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 13px;
+  color: #8aa5c7;
+  font-weight: 600;
+  margin-bottom: 30px;
+}
+.preview-line {
+  background: #eaf0f8;
+  height: 8px;
+  border-radius: 4px;
+  width: 55%;
+  margin: 15px 0;
+}
+.preview-line.long {
+  width: 95%;
+}
+.preview-line.medium {
+  width: 77%;
+}
+.onboarding-auto {
+  position: relative;
+  z-index: 1;
+  background: #ffffffed;
+  backdrop-filter: blur(15px);
+  border: 1px solid #edf2fa;
+  padding: 25px;
+  border-radius: 23px;
+  box-shadow: 0 15px 60px #3e79cc0f;
+  width: 100%;
+  margin-left: 37px;
+}
+.onboarding-auto > span {
+  display: flex;
+  gap: 6px;
+  color: #6a9bd9;
+  font-size: 12px;
+  margin-bottom: 23px;
+  font-weight: 600;
+}
+.onboarding-auto > div {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  margin-top: 21px;
+}
+.onboarding-auto i {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f0f6ff;
+  color: #9eb9dc;
+}
+.onboarding-auto p {
+  flex: 1;
+}
+.onboarding-auto strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.onboarding-auto small {
+  display: block;
+  font-size: 11px;
+  color: #9ca9ba;
+  margin-top: 6px;
+}
+.onboarding-auto > div > svg {
+  color: #6fb6a1;
+}
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  border-top: 1px solid #e5ebf4;
+  padding: 35px 12px;
+}
+.onboarding-steps b {
+  font-size: 11px;
+  font-weight: 650;
+  color: #8faed6;
+  display: block;
+  margin-bottom: 13px;
+}
+.onboarding-steps strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.onboarding-steps p {
+  margin-top: 11px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #8b97a8;
+}
+.document-onboarding > footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 25px 12px;
+  font-size: 11px;
+  color: #a4afbe;
+}
+.document-onboarding > footer > span {
+  font-size: 18px;
+  font-weight: 750;
+}
+.pet-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  justify-content: space-between;
+  margin: 0 0 25px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e8edf4;
+}
+.pet-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #7e9dc6;
+  min-width: 0;
+}
+.pet-picker select {
+  min-width: 90px;
+  max-width: 430px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #44566d;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  padding: 8px 0;
+}
+.pet-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8195af;
+  font-size: 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.health-briefing {
+  background: #fff;
+  border: 1px solid #e6edf8;
+  border-radius: 23px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+.health-briefing.compact {
+  padding: 21px;
+  margin-bottom: 0;
+  background: linear-gradient(130deg, #f4f8ff, #fff);
+}
+.brief-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.brief-spark {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 38px;
+  height: 38px;
+  background: #eaf2ff;
+  border-radius: 13px;
+  color: #81a7dc;
+  flex-shrink: 0;
+}
+.brief-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.brief-heading strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+  color: #4b6589;
+}
+.brief-heading small {
+  display: block;
+  color: #8fa0b6;
+  font-size: 10px;
+  margin-top: 7px;
+  line-height: 1.6;
+}
+.brief-heading > svg {
+  color: #719ad0;
+  flex-shrink: 0;
+}
+.brief-summary {
+  margin-top: 21px;
+  font-size: 17px;
+  line-height: 1.9;
+  color: #40536e;
+  font-weight: 550;
+  word-break: keep-all;
+}
+.compact .brief-heading strong {
+  font-size: 12px;
+}
+.compact .brief-heading {
+  gap: 8px;
+}
+.compact .brief-spark {
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+}
+.compact .brief-heading small {
+  font-size: 9px;
+}
+.compact .brief-summary {
+  font-size: 13px;
+  line-height: 1.9;
+  margin-top: 15px;
+  font-weight: 500;
+}
+.brief-stale {
+  background: #fffaed;
+  padding: 10px;
+  font-size: 11px;
+  color: #b49a61;
+  border-radius: 9px;
+  margin-top: 12px;
+}
+.health-briefing h3 {
+  font-size: 14px;
+  font-weight: 650;
+  color: #65768d;
+  margin: 29px 0 15px;
+}
+.brief-current > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f3f8;
+}
+.brief-current > div > span {
+  flex-shrink: 0;
+  color: #82ad9e;
+  padding-top: 2px;
+}
+.brief-current p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #697a91;
+}
+.brief-sources {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+.brief-sources > button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 10px;
+  color: #90a1b8;
+  background: #f4f7fb;
+  cursor: pointer;
+}
+.watch-card {
+  border: 1px solid #edf0f5;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 13px;
+}
+.watch-title {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #bea574;
+}
+.watch-title > strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #67798f;
+}
+.watch-title > span {
+  color: #b6a27e;
+  font-size: 9px;
+  margin-left: auto;
+  background: #fff9eb;
+  padding: 4px 6px;
+  border-radius: 5px;
+}
+.watch-card > p {
+  margin-top: 13px;
+  color: #7c8b9e;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.prepare-note {
+  background: #f5f8fc;
+  border-radius: 11px;
+  padding: 13px 15px;
+  margin-top: 14px;
+}
+.prepare-note > span {
+  font-size: 10px;
+  color: #8398b4;
+  font-weight: 650;
+}
+.prepare-note p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #71839a;
+  margin-top: 7px;
+}
+.clinical-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+.clinical-links > a {
+  color: #99a8bc;
+  font-size: 9px;
+  text-decoration: none;
+}
+.brief-questions {
+  padding-left: 19px;
+  font-size: 13px;
+  color: #738399;
+  line-height: 2;
+}
+.brief-questions > li {
+  margin: 9px 0;
+}
+.brief-unknowns {
+  border-radius: 13px;
+  background: #f7f9fc;
+  padding: 17px;
+  margin-top: 23px;
+}
+.brief-unknowns > strong {
+  font-size: 12px;
+  color: #8b9bb0;
+  font-weight: 600;
+}
+.brief-unknowns p {
+  font-size: 12px;
+  color: #8b99ad;
+  line-height: 1.9;
+  margin-top: 7px;
+}
+.brief-empty {
+  font-size: 12px;
+  color: #8c9bb0;
+  line-height: 1.9;
+  padding: 21px 0 3px;
+}
+.brief-skeleton {
+  height: 13px;
+  background: #edf2f9;
+  border-radius: 5px;
+  margin: 8px 0;
+  width: 94%;
+  animation: brief-pulse 1.5s infinite;
+}
+.brief-skeleton.short {
+  width: 65%;
+}
+.brief-empty > p {
+  margin-top: 13px;
+  font-size: 11px;
+}
+.brief-error {
+  font-size: 11px;
+  color: #b28f80;
+  line-height: 1.8;
+  background: #fff8f4;
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 15px;
+}
+.brief-error button {
+  background: transparent;
+  color: #8e9fba;
+  font-size: 11px;
+  border: 0;
+  padding-left: 10px;
+  cursor: pointer;
+}
+.brief-details {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 0;
+  border-top: 1px solid #e9eff7;
+  padding: 15px 0 0;
+  margin-top: 18px;
+  background: transparent;
+  color: #83a1c7;
+  font-size: 11px;
+  cursor: pointer;
+}
+.brief-footnote {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #f0f3f7;
+  font-size: 10px;
+  color: #a1adbd;
+  line-height: 1.9;
+}
+.medical-history {
+  margin-top: 30px;
+}
+.medical-event {
+  display: flex;
+  gap: 24px;
+  padding: 21px 0;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #e9edf4;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.medical-event-date {
+  color: #9aa9bd;
+  font-size: 11px;
+  white-space: nowrap;
+  padding-top: 3px;
+}
+.medical-event > div {
+  flex: 1;
+}
+.condition-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.condition-tags > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #7396c2;
+  background: #eaf2fd;
+  padding: 7px 10px;
+  border-radius: 7px;
+}
+.condition-tags small {
+  font-size: 9px;
+  opacity: 0.8;
+}
+.condition-tags > span.suspected {
+  background: #fff5e5;
+  color: #b0996c;
+}
+.medical-event p {
+  color: #8494a9;
+  font-size: 12px;
+  line-height: 1.9;
+  margin-top: 9px;
+}
+.medical-source {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #a1aec0;
+  font-size: 10px;
+  margin-top: 9px;
+}
+.patient-review {
+  background: #f6f9fd;
+  border: 1px solid #eaf0f8;
+  padding: 17px;
+  border-radius: 16px;
+  margin-bottom: 17px;
+}
+.patient-review h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #7f9dc3;
+  font-size: 12px;
+  font-weight: 600;
+}
+.patient-target {
+  display: block;
+  width: 100%;
+  height: 45px;
+  border: 1px solid #e2eaf5;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #7386a0;
+  background: white;
+  margin-top: 8px;
+}
+@keyframes brief-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (max-width: 1000px) {
+  .onboarding-layout {
+    gap: 30px;
+  }
+  .onboarding-copy h1 {
+    font-size: 39px;
+  }
+  .onboarding-auto {
+    margin-left: 0;
+    padding: 20px;
+  }
+  .onboarding-copy > p {
+    font-size: 14px;
+  }
+  .onboarding-preview {
+    min-height: 370px;
+  }
+  .dashboard-secondary .health-briefing {
+    grid-column: 1/-1;
+    order: 3;
+  }
+}
+@media (max-width: 760px) {
+  .document-onboarding {
+    padding: 24px 24px 0;
+  }
+  .document-onboarding .brand {
+    padding-left: 0;
+    font-size: 29px;
+    gap: 5px;
+  }
+  .document-onboarding > header > span {
+    font-size: 9px;
+  }
+  .onboarding-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 54px 0 25px;
+    gap: 30px;
+    align-items: stretch;
+  }
+  .onboarding-copy h1 {
+    font-size: 37px;
+    line-height: 1.35;
+    margin: 20px 0;
+    letter-spacing: -1.5px;
+  }
+  .onboarding-copy > p {
+    font-size: 13px;
+    line-height: 1.9;
+    margin-bottom: 25px;
+  }
+  .onboarding-copy > .inline-flex {
+    width: 100%;
+    font-size: 14px;
+    padding: 0 15px;
+  }
+  .onboarding-privacy {
+    font-size: 10px;
+    margin-top: 13px;
+  }
+  .onboarding-copy > .sample-link {
+    font-size: 10px;
+    margin-top: 12px !important;
+  }
+  .onboarding-preview {
+    min-height: 285px;
+    padding: 0;
+    margin-top: 14px;
+  }
+  .onboarding-paper {
+    width: 170px;
+    height: 180px;
+    top: -8px;
+    left: 10px;
+    padding: 19px;
+  }
+  .onboarding-paper > span {
+    font-size: 11px;
+    margin-bottom: 20px;
+  }
+  .onboarding-auto {
+    margin-left: 30px;
+    margin-top: 80px;
+    padding: 20px;
+  }
+  .onboarding-auto > span {
+    font-size: 11px;
+    margin-bottom: 18px;
+  }
+  .onboarding-auto > div {
+    margin-top: 16px;
+    gap: 10px;
+  }
+  .onboarding-auto i {
+    padding: 10px;
+  }
+  .onboarding-auto strong {
+    font-size: 12px;
+  }
+  .onboarding-auto small {
+    font-size: 10px;
+  }
+  .onboarding-steps {
+    grid-template-columns: 1fr;
+    gap: 23px;
+    padding: 28px 0;
+  }
+  .onboarding-steps > div {
+    position: relative;
+    padding-left: 35px;
+  }
+  .onboarding-steps b {
+    position: absolute;
+    left: 0;
+    top: 3px;
+  }
+  .onboarding-steps strong {
+    font-size: 13px;
+  }
+  .onboarding-steps p {
+    font-size: 11px;
+    margin-top: 8px;
+  }
+  .document-onboarding > footer {
+    padding: 22px 0;
+    font-size: 10px;
+  }
+  .pet-toolbar {
+    margin-bottom: 23px;
+    padding-bottom: 18px;
+    gap: 8px;
+  }
+  .pet-picker {
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+  }
+  .pet-picker select {
+    max-width: 190px;
+    min-width: 60px;
+    font-size: 12px;
+  }
+  .pet-picker > svg {
+    flex-shrink: 0;
+    width: 17px;
+  }
+  .pet-add {
+    font-size: 10px;
+    gap: 4px;
+  }
+  .pet-add > svg {
+    width: 13px;
+  }
+  .health-briefing {
+    padding: 21px 18px;
+    border-radius: 19px;
+  }
+  .health-briefing.compact {
+    padding: 20px;
+  }
+  .brief-heading strong {
+    font-size: 13px;
+  }
+  .brief-summary {
+    font-size: 15px;
+    margin-top: 19px;
+    line-height: 1.9;
+  }
+  .brief-heading small {
+    font-size: 9px;
+  }
+  .watch-card {
+    padding: 17px 14px;
+  }
+  .watch-title {
+    gap: 5px;
+  }
+  .watch-title strong {
+    font-size: 13px;
+  }
+  .watch-title > span {
+    font-size: 8px;
+  }
+  .watch-card > p {
+    font-size: 12px;
+  }
+  .prepare-note {
+    padding: 12px;
+  }
+  .prepare-note p {
+    font-size: 11px;
+  }
+  .medical-event {
+    gap: 14px;
+  }
+  .medical-event-date {
+    font-size: 9px;
+  }
+  .condition-tags > span {
+    padding: 6px 8px;
+    font-size: 11px;
+    gap: 5px;
+  }
+  .condition-tags small {
+    font-size: 8px;
+  }
+  .medical-event p {
+    font-size: 11px;
+  }
+  .medical-history {
+    margin-top: 26px;
+  }
+  .medical-source {
+    font-size: 9px;
+  }
+  .patient-review {
+    padding: 14px;
+  }
+  .main-content {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}
+.patient-summary {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: #fff;
+  border: 1px solid #edf1f7;
+  padding: 19px 22px;
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+.patient-summary > div {
+  flex: 1;
+}
+.patient-summary strong {
+  font-size: 17px;
+  font-weight: 650;
+  color: #4f647e;
+}
+.patient-summary p {
+  font-size: 12px;
+  color: #8fa0b6;
+  margin-top: 6px;
+}
+.patient-summary > small {
+  color: #a3b0c1;
+  font-size: 10px;
+}
+.brief-consent-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 9px;
+  background: #eaf2ff;
+  color: #6b91c3;
+  padding: 12px;
+  font-size: 12px;
+  margin-top: 13px;
+  cursor: pointer;
+}
+.brief-setting {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  justify-content: space-between;
+  padding: 18px 0 0;
+  margin-top: 20px;
+  border-top: 1px solid #edf1f6;
+}
+.brief-setting strong {
+  font-size: 13px;
+  color: #6c7f98;
+}
+.brief-setting p {
+  color: #98a6b8;
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 6px;
+}
+/* Keep medical content and evidence readable on smaller screens. */
+.brief-current p,
+.watch-card > p,
+.prepare-note p,
+.brief-questions,
+.brief-unknowns p {
+  color: #52647b;
+  font-size: 14px;
+}
+.brief-sources > button,
+.clinical-links > a {
+  color: #59718f;
+  font-size: 12px;
+  min-height: 32px;
+  align-items: center;
+}
+.clinical-links > a {
+  display: inline-flex;
+}
+@media (max-width: 760px) {
+  .patient-summary {
+    padding: 17px;
+    gap: 10px;
+  }
+  .patient-summary strong {
+    font-size: 15px;
+  }
+  .patient-summary p {
+    font-size: 11px;
+  }
+  .patient-summary > small {
+    font-size: 9px;
+  }
+  .health-briefing .brief-current p,
+  .health-briefing .watch-card > p,
+  .health-briefing .prepare-note p,
+  .health-briefing .brief-questions,
+  .health-briefing .brief-unknowns p {
+    font-size: 14px;
+  }
+  .health-briefing .brief-heading small,
+  .health-briefing .brief-footnote,
+  .health-briefing .prepare-note > span,
+  .health-briefing .watch-title > span {
+    font-size: 11px;
+  }
+}

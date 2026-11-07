@@ -130,3 +130,30 @@ test("repeated medication names need review instead of losing one dose plan", ()
   doc.items.push({ ...doc.items[0], dose: "2정", times: ["20:00"] });
   assert.match(validateItems(doc.items)!, /같은 이름/);
 });
+test("a dose record keeps the dose that was checked even after a same-day prescription update", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  const key = doseKey(id, date, "08:00");
+  s = toggleCheck(s, key, localISO("08:03"));
+  s = applyPrescription(s, document("changed", date, "2정"));
+  assert.equal(scheduleFor(s, date)[0].revision.dose, "1회 1정");
+  assert.equal(scheduleFor(s, date)[1].revision.dose, "2정");
+  assert.equal(s.doseSnapshots?.[key].documentId, "first");
+  s = toggleCheck(s, key);
+  assert.equal(s.doseSnapshots?.[key], undefined);
+});
+
+test("completed doses remain visible when a later prescription removes their time slot", () => {
+  let s = applyPrescription(emptyState(), document());
+  const id = s.medications[0].id;
+  s = toggleCheck(s, doseKey(id, date, "08:00"), localISO("08:03"));
+  const changed = document("changed-times", date, "2정");
+  changed.items[0].times = ["12:00"];
+  s = applyPrescription(s, changed);
+  const rows = scheduleFor(s, date);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].time, "08:00");
+  assert.ok(rows[0].checkedAt);
+  assert.equal(rows[0].revision.dose, "1회 1정");
+  assert.equal(rows[1].time, "12:00");
+});

@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
-import { emptyState, type AppState } from "./domain";
+import { migrateStore, type Household } from "./household.ts";
 
 let connection: Promise<IDBPDatabase> | undefined;
 function db() {
@@ -10,14 +10,17 @@ function db() {
     },
   }));
 }
-export async function readState(): Promise<AppState> {
-  const stored = await (await db()).get("state", "current");
-  if (stored && stored.version !== 1)
-    throw new Error("이 브라우저의 기록 형식을 확인하지 못했어요.");
-  return stored ?? emptyState();
+export async function readState(): Promise<Household> {
+  const transaction = (await db()).transaction("state", "readwrite");
+  const stored = await transaction.store.get("current");
+  const migrated = migrateStore(stored);
+  if (!stored || stored.version !== 2)
+    await transaction.store.put(migrated, "current");
+  await transaction.done;
+  return migrated;
 }
 export async function writeState(
-  state: AppState,
+  state: Household,
   file?: { id: string; blob: Blob },
   reset = false,
   removeFileId?: string,

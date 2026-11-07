@@ -39,7 +39,7 @@ jobs:
       - name: Check types
         run: npm run check
 
-      - name: Test prescription and dose history
+      - name: Test patient isolation, dose history, and briefing evidence
         run: npm test
 
       - name: Check committed migrations match the schema

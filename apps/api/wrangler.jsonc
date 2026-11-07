@@ -8,7 +8,7 @@
   "preview_urls": false,
   "ai": { "binding": "AI", "remote": true },
   "vars": { "AI_GATEWAY_ID": "default" },
-  "ratelimits": [{ "name": "AI_LIMITER", "namespace_id": "100701", "simple": { "limit": 5, "period": 60 } }],
+  "ratelimits": [{ "name": "AI_LIMITER", "namespace_id": "100701", "simple": { "limit": 5, "period": 60 } }, { "name": "BRIEF_LIMITER", "namespace_id": "100702", "simple": { "limit": 6, "period": 60 } }],
   "d1_databases": [
     {
       "binding": "DB",
