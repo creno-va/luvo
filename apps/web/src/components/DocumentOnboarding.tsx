@@ -50,7 +50,7 @@ export function DocumentOnboarding({
           <div className="onboarding-privacy">
             <LockKeyhole size={14} />
             <span>
-              기록은 이 브라우저에 남아요. 사진 분석만 Cloudflare AI를 이용해요.
+              기록은 이 브라우저에 남아요. 동의하면 사진·건강 기록을 Cloudflare AI로 분석해요.
             </span>
           </div>
           <button className="sample-link" onClick={onSample}>
