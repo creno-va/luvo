@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luvo-web",
+  "account_id": "9e844969d0c44b2449f3951d1f301654",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-07",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "luvo.baro.site", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api", "/api/*"],
+    "not_found_handling": "404-page"
+  },
+  "services": [{ "binding": "API", "service": "luvo-api" }],
+  "observability": { "enabled": true }
+}

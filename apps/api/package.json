@@ -1,0 +1,15 @@
+{
+  "name": "@luvo/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --project tsconfig.json",
+    "cf:typegen": "npx wrangler types worker-configuration.d.ts --env-interface ApiBindings",
+    "deploy": "npx wrangler deploy"
+  },
+  "dependencies": {
+    "@luvo/db": "*",
+    "hono": "4.13.17"
+  }
+}

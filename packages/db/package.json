@@ -1,0 +1,16 @@
+{
+  "name": "@luvo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate --config drizzle.config.ts",
+    "check": "tsc --project tsconfig.json"
+  },
+  "dependencies": { "drizzle-orm": "0.45.4" },
+  "devDependencies": { "drizzle-kit": "0.31.11" }
+}
