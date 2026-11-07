@@ -95,6 +95,7 @@ export default function LuvoApp() {
   const [date, setDate] = useState(localDate());
   const [calendar, setCalendar] = useState(false);
   const [upload, setUpload] = useState(false);
+  const [uploadPetId, setUploadPetId] = useState<string>();
   const [document, setDocument] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
@@ -229,6 +230,10 @@ export default function LuvoApp() {
       true,
     );
   }
+  function openRecord(petId?: string) {
+    setUploadPetId(petId);
+    setUpload(true);
+  }
   async function saveDocument(draft: Draft, doc: DocumentRecord) {
     let previous: Household | undefined;
     const ok = await persist(
@@ -306,7 +311,7 @@ export default function LuvoApp() {
     <div className="care-app">
       {!pet || view === "welcome" ? (
         <DocumentOnboarding
-          onUpload={() => setUpload(true)}
+          onUpload={() => openRecord()}
           onSample={() => void installSample()}
         />
       ) : (
@@ -367,7 +372,7 @@ export default function LuvoApp() {
                   <div className="sample-notice">
                     <Sparkles size={14} />
                     <span>샘플 기록이에요. 자유롭게 눌러보세요.</span>
-                    <button onClick={() => setUpload(true)}>
+                    <button onClick={() => openRecord()}>
                       내 기록 시작 <ArrowUpRight size={14} />
                     </button>
                   </div>
@@ -477,7 +482,7 @@ export default function LuvoApp() {
                 </div>
                 <button
                   className="add-dog-card"
-                  onClick={() => setUpload(true)}
+                  onClick={() => openRecord()}
                 >
                   <span>
                     <Plus size={24} />
@@ -532,7 +537,7 @@ export default function LuvoApp() {
               </span>
               <button
                 className="primary-action"
-                onClick={() => setUpload(true)}
+                onClick={() => openRecord(view === "dogs" ? undefined : pet.id)}
               >
                 <Plus size={21} />
                 <span>건강 기록 추가</span>
@@ -546,6 +551,7 @@ export default function LuvoApp() {
         open={upload}
         onOpenChange={setUpload}
         state={pet ?? empty}
+        initialPetId={uploadPetId}
         pets={store.pets}
         saving={saving}
         onSaved={saveDocument}

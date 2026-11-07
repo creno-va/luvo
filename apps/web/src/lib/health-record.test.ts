@@ -12,10 +12,12 @@ import {
 import { writeState, readState, readFile } from "./storage.ts";
 import { timelineEntries } from "./chronology.ts";
 
-test("manual records need no file or OCR and do not inherit sample identity", () => {
+test("a selected sample dog prefills basic details without reusing its stored identity or health history", () => {
   const draft = manualDraft(sampleState(), "2026-11-07");
   assert.equal(draft.file, undefined);
-  assert.equal(draft.extraction.animal.name, "");
+  assert.equal(draft.extraction.animal.name, sampleState().profile.name);
+  assert.equal(draft.targetPetId, "new");
+  assert.deepEqual(draft.extraction.conditions, []);
   assert.equal(draft.extraction.date, "2026-11-07");
   assert.deepEqual(draft.extraction.medications, []);
   assert.notEqual(draft.fingerprint, manualDraft().fingerprint);
@@ -40,11 +42,24 @@ test("a text-only record registers a dog and keeps manual provenance in storage 
 
 test("existing dog identity is reused and blank manual records cannot be saved", () => {
   const pet = emptyState();
-  pet.profile = { name: "보리", breed: "푸들", detail: "푸들" };
+  pet.profile = {
+    name: "보리",
+    breed: "푸들",
+    sex: "암컷",
+    age: "7세",
+    weight: "4.2 kg",
+    detail: "푸들",
+  };
   const draft = manualDraft(pet, "2026-11-07");
   const store = { version: 3 as const, activePetId: pet.id, pets: [pet] };
   assert.equal(draft.targetPetId, pet.id);
-  assert.equal(draft.extraction.animal.breed, "푸들");
+  assert.deepEqual(draft.extraction.animal, {
+    name: "보리",
+    breed: "푸들",
+    sex: "암컷",
+    age: "7세",
+    weight: "4.2 kg",
+  });
   assert.throws(
     () => ingestDocument(store, draftDocument(draft), pet.id),
     /건강 기록이나 약 정보/,
@@ -54,6 +69,23 @@ test("existing dog identity is reused and blank manual records cannot be saved",
     ingestDocument(store, draftDocument(draft), pet.id).pets.length,
     1,
   );
+});
+
+test("a new dog entry stays blank and editing a prefilled draft does not change the saved profile", () => {
+  const pet = emptyState();
+  pet.profile = { name: "보리", breed: "푸들", detail: "푸들" };
+  const draft = manualDraft(pet);
+  draft.extraction.animal.name = "입력 중 수정";
+  assert.equal(pet.profile.name, "보리");
+  const fresh = manualDraft();
+  assert.equal(fresh.targetPetId, "new");
+  assert.deepEqual(fresh.extraction.animal, {
+    name: "",
+    breed: "",
+    sex: "",
+    age: "",
+    weight: undefined,
+  });
 });
 
 test("optional medication-only manual entry keeps the existing schedule validation", () => {

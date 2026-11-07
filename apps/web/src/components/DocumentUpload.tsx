@@ -54,6 +54,7 @@ export function DocumentUpload({
   open,
   onOpenChange,
   state,
+  initialPetId,
   pets,
   saving,
   onSaved,
@@ -61,6 +62,7 @@ export function DocumentUpload({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   state: AppState;
+  initialPetId?: string;
   pets: AppState[];
   saving: boolean;
   onSaved: (draft: Draft, document: DocumentRecord) => Promise<{ ok: boolean }>;
@@ -251,7 +253,7 @@ export function DocumentUpload({
     queue.current = [];
     setError("");
     setDraft(
-      manualDraft(pets.find((pet) => pet.id === state.id && !pet.sample)),
+      manualDraft(pets.find((pet) => pet.id === initialPetId)),
     );
     setStep("review");
   }
@@ -592,10 +594,7 @@ export function DocumentUpload({
                 <Dog size={17} />
                 {draft.file ? "문서에서 읽은 강아지 정보" : "기록할 강아지"}
               </h3>
-              {(draft.file ||
-                !draft.targetPetId ||
-                draft.targetPetId === "new") && (
-                <>
+              <>
                   <div className="review-fields">
                     <label>
                       강아지 이름
@@ -690,8 +689,7 @@ export function DocumentUpload({
                       />
                     </label>
                   </div>
-                </>
-              )}
+              </>
               {pets.filter((p) => !p.sample).length > 0 && (
                 <label className="field-label">
                   이 기록을 연결할 강아지
