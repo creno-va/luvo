@@ -375,8 +375,16 @@ export default function LuvoApp() {
                       saving={saving}
                       onResearch={(id) => navigate("medication", id)}
                       onToggle={async (id) => {
+                        const medication = pet.medications.find(
+                          (m) => m.id === id,
+                        );
+                        const wasPaused = medication?.pauses.some(
+                          (p) => !p.end,
+                        );
                         if (await mutate((p) => toggleMedication(p, id)))
-                          setToast("복용 여부와 쉰 기간을 기록했어요.");
+                          setToast(
+                            `${medication?.name || "약"} ${wasPaused ? "복용을 재개했어요." : "복용 중단을 기록했어요."}`,
+                          );
                       }}
                       onCheck={async (key) => {
                         if (await mutate((p) => toggleCheck(p, key)))
@@ -875,12 +883,22 @@ function MedicationList({
                   <p>{plan.dose}</p>
                 </div>
                 {prescribed && (
-                  <Switch
-                    checked={!paused}
+                  <button
+                    type="button"
+                    className={`medication-status-chip ${paused ? "is-stopped" : "is-taking"}`}
                     disabled={saving}
-                    onCheckedChange={() => void onToggle(med.id)}
-                    aria-label={`${med.name} 복용 중`}
-                  />
+                    onClick={() => void onToggle(med.id)}
+                    aria-label={`${med.name}: ${paused ? "복용 중단, 눌러서 재개하기" : "복용 중, 눌러서 중단하기"}`}
+                  >
+                    <span className="medication-status-label">
+                      <i aria-hidden="true" />
+                      {paused ? "복용 중단" : "복용 중"}
+                    </span>
+                    <span className="medication-status-action">
+                      {paused ? "재개하기" : "중단하기"}
+                      <ArrowRight size={12} aria-hidden="true" />
+                    </span>
+                  </button>
                 )}
               </div>
               <div className="med-schedule">
@@ -895,7 +913,7 @@ function MedicationList({
                       {row.checkedAt
                         ? "먹였어요"
                         : row.paused
-                          ? "쉬는 시간"
+                          ? "중단한 시간"
                           : "투약 체크"}
                     </small>
                     <Checkbox
@@ -938,7 +956,8 @@ function MedicationList({
         </div>
       )}
       <p className="toggle-note">
-        토글을 끄면 쉬는 기간을 기록해요. 처방은 그대로 남아요.
+        약의 상태 버튼을 눌러 복용을 중단하거나 재개할 수 있어요. 중단 기간과
+        이전 처방·투약 기록은 남겨요.
       </p>
     </section>
   );

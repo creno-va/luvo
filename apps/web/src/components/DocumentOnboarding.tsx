@@ -140,7 +140,7 @@ export function DocumentOnboarding({ onUpload }: { onUpload: () => void }) {
               icon: CheckCheck,
               n: "02",
               title: "약을 먹인 뒤, 한 번의 체크",
-              text: "시간에 맞춰 먹였는지 체크하고, 쉬는 동안에는 토글만 꺼두세요.",
+              text: "먹인 약은 시간별로 체크해요. 복용 중단·재개는 약의 상태 버튼에서 기록해요.",
             },
             {
               icon: Sparkles,

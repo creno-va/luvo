@@ -60,6 +60,103 @@
   font-size: 12px;
   color: #617555;
 }
+.med-card-top {
+  display: grid;
+  grid-template-columns: 43px minmax(0, 1fr) auto;
+}
+.medication-status-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 100px;
+  min-height: 52px;
+  padding: 9px 12px;
+  border: 1px solid #b9dfbc;
+  border-radius: 13px;
+  background: #eaf7e8;
+  color: #30623a;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.medication-status-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.medication-status-label i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4b9854;
+}
+.medication-status-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.medication-status-chip:hover {
+  background: #d9f1d7;
+  border-color: #83bc8a;
+}
+.medication-status-chip.is-stopped {
+  color: #895c20;
+  background: #fff3df;
+  border-color: #ead0a4;
+}
+.medication-status-chip.is-stopped .medication-status-label i {
+  background: #bf8a3d;
+}
+.medication-status-chip.is-stopped:hover {
+  background: #f9e7c9;
+  border-color: #cda96c;
+}
+.medication-status-chip:focus-visible {
+  outline: 3px solid #83b989;
+  outline-offset: 3px;
+}
+.medication-status-chip:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.med-card.is-paused {
+  background: #fcfaf5;
+  border-color: #e6dac4;
+}
+.med-card.is-paused .med-card-footer {
+  border-color: #eae1d3;
+}
+.med-card.is-paused .paused-label {
+  color: #936c32;
+}
+.med-card.is-paused .paused-label i {
+  background: #bd8a43;
+}
+@media (max-width: 600px) {
+  .med-card-top {
+    grid-template-columns: 43px minmax(0, 1fr);
+    gap: 10px 12px;
+  }
+  .medication-status-chip {
+    grid-column: 2;
+    justify-self: start;
+    flex-direction: row;
+    gap: 14px;
+    min-height: 44px;
+  }
+  .medication-status-action {
+    font-size: 11px;
+  }
+}
 .care-preparation-intro {
   color: #7e8a73;
   font-size: 12px;

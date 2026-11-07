@@ -52,7 +52,7 @@ test("a paused current prescription stays visible to allow resume", () => {
   const paused = toggleMedication(pet, med.id, "2026-11-07T00:00:00Z");
   assert.equal(
     medicationList(paused, "2026-11-07", true).medications[0].status,
-    "복용 쉬는 중",
+    "복용 중단",
   );
 });
 test("completed same-day doses stay visible after a stop record", () => {

@@ -31,7 +31,7 @@ export function medicationList(
           )[0];
         const status = prescribed
           ? med.pauses.some((p) => !p.end)
-            ? "복용 쉬는 중"
+            ? "복용 중단"
             : "복용 중"
           : plan?.startDate > date
             ? "시작 전"
