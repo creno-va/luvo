@@ -56,6 +56,7 @@ export function useHealthAnalysis(pet: AppState | null, onCommit: Commit) {
         return;
       setLoading(true);
       setError("");
+      const deadline = window.setTimeout(() => controller.abort(), 65000);
       try {
         const response = await fetch("/api/briefings/analyze", {
           method: "POST",
@@ -73,11 +74,15 @@ export function useHealthAnalysis(pet: AppState | null, onCommit: Commit) {
         await commit.current(petId, signature, data as HealthBriefing);
       } catch (cause) {
         if (cancelled) return;
-        const message =
-          cause instanceof Error ? cause.message : "브리핑을 마치지 못했어요.";
+        const message = controller.signal.aborted
+          ? "분석이 오래 걸리고 있어요. 아래 관리 안내를 먼저 확인하고 다시 분석해 주세요."
+          : cause instanceof Error
+            ? cause.message
+            : "브리핑을 마치지 못했어요.";
         setError(message);
         await commit.current(petId, signature, undefined, message);
       } finally {
+        window.clearTimeout(deadline);
         if (!cancelled) setLoading(false);
       }
     }, 1600);
@@ -87,5 +92,5 @@ export function useHealthAnalysis(pet: AppState | null, onCommit: Commit) {
       window.clearTimeout(timeout);
     };
   }, [signature, retry, pet?.id, pet?.analysisConsent]);
-  return { loading, error, hash, refresh: () => setRetry((n) => n + 1) };
+  return { day, loading, error, hash, refresh: () => setRetry((n) => n + 1) };
 }

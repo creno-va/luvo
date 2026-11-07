@@ -18,6 +18,7 @@ import type { PrescriptionItem } from "@/lib/domain";
 
 type Fact = { text: string; sourceIds: string[] };
 type Research = {
+  status?: "complete" | "references_only" | "not_found";
   matched: boolean;
   identifiedAs: string;
   overview: Fact[];
@@ -73,7 +74,10 @@ export function MedicationResearch({
       try {
         const response = await fetch("/api/medications/research", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(version > 0 ? { "Cache-Control": "no-cache" } : {}),
+          },
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
@@ -82,14 +86,24 @@ export function MedicationResearch({
           throw new Error(result.error || "약 정보를 가져오지 못했어요.");
         if (
           !Array.isArray(result.sources) ||
-          !Array.isArray(result.overview) ||
+          ![
+            "overview",
+            "uses",
+            "sideEffects",
+            "cautions",
+            "questions",
+            "unknowns",
+            "queries",
+          ].every((key) => Array.isArray(result[key])) ||
           typeof result.matched !== "boolean"
         )
           throw new Error("결과를 정리하지 못했어요. 다시 검색해 주세요.");
         if (alive) {
           setData(result);
-          if (cache.size >= 40) cache.delete(cache.keys().next().value!);
-          cache.set(key, { at: Date.now(), data: result });
+          if (result.matched) {
+            if (cache.size >= 40) cache.delete(cache.keys().next().value!);
+            cache.set(key, { at: Date.now(), data: result });
+          }
         }
       } catch (cause) {
         if (alive)
@@ -187,7 +201,13 @@ export function MedicationResearch({
         onSubmit={(e) => {
           e.preventDefault();
           const value = input.trim();
-          if (!value || loading) return;
+          if (
+            !value ||
+            (loading &&
+              value ===
+                (search.ingredient || search.productName || search.name))
+          )
+            return;
           setSearch(
             value === initial
               ? {
@@ -218,17 +238,27 @@ export function MedicationResearch({
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={
+              !input.trim() ||
+              (loading &&
+                input.trim() ===
+                  (search.ingredient || search.productName || search.name))
+            }
             aria-label="약 정보 검색"
           >
-            {loading ? (
+            {loading &&
+            input.trim() ===
+              (search.ingredient || search.productName || search.name) ? (
               <LoaderCircle size={19} className="animate-spin" />
             ) : (
               <ArrowUpRight size={21} />
             )}
           </button>
         </div>
-        <small>처방전에 적힌 이름으로 검색하면 더 정확해요.</small>
+        <small>
+          처방전에 적힌 이름으로 검색하면 더 정확해요.
+          {loading ? " 다른 이름을 입력하면 지금 검색을 바꿀 수 있어요." : ""}
+        </small>
       </form>
       <div aria-live="polite" aria-busy={loading}>
         {loading ? (
@@ -264,8 +294,12 @@ export function MedicationResearch({
           <>
             <div className="research-meta">
               <span>
-                <Check size={14} />
-                {data.matched ? "웹 자료 확인" : "약 이름 확인 필요"}
+                {data.matched ? <Check size={14} /> : <Search size={14} />}
+                {data.matched
+                  ? "웹 자료 확인"
+                  : data.status === "references_only"
+                    ? "검색 자료 · 일치 여부 확인 필요"
+                    : "약 이름 확인 필요"}
               </span>
               <time dateTime={data.searchedAt}>
                 {new Date(data.searchedAt).toLocaleDateString("ko-KR", {
@@ -309,10 +343,15 @@ export function MedicationResearch({
             ) : (
               <section className="research-empty">
                 <Search size={30} />
-                <h2>이름을 조금 더 알려주세요</h2>
+                <h2>
+                  {data.status === "references_only"
+                    ? "확인할 웹 자료를 찾았어요"
+                    : "이름을 조금 더 알려주세요"}
+                </h2>
                 <p>
-                  성분이나 제품이 확인되어야
-                  <br />이 약에 맞는 정보를 정리할 수 있어요.
+                  {data.status === "references_only"
+                    ? "아래 원문과 약 이름을 먼저 대조해 주세요. 자동 요약은 다시 시도할 수 있어요."
+                    : "성분이나 제품이 확인되어야 이 약에 맞는 정보를 정리할 수 있어요."}
                 </p>
               </section>
             )}
@@ -346,7 +385,9 @@ export function MedicationResearch({
                   <ChevronDown size={18} />
                 </summary>
                 <p>
-                  웹 검색 결과와 확인 가능한 원문으로 정리했어요.
+                  {data.matched
+                    ? "웹 검색 결과와 확인 가능한 원문으로 정리했어요."
+                    : "검색으로 찾은 자료예요. 입력한 약과 같은 성분·제품인지 확인해 주세요."}
                   <br />
                   전체 내용은 원문에서 확인해 주세요.
                 </p>

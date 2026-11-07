@@ -28,7 +28,7 @@ export function isClinicalConditionName(name: string): boolean {
   );
 }
 
-const hasContent = (value: string) =>
+export const hasRecordContent = (value: string) =>
   !!value.trim() &&
   !/^(?:과거병력|병력|병명|진단명|미기재|없음|해당없음|unknown|n\/?a|null|undefined)$/.test(
     key(value),
@@ -43,7 +43,7 @@ export function recordOverview(record: RecordContent): string {
     record.diagnosis,
     record.summary || "",
     ...findings.flatMap((c) => [c.name, c.note]),
-  ].filter(hasContent);
+  ].filter(hasRecordContent);
   const text = content.join(" ");
   // Only condense explicit birth-exam findings. A missing diagnosis alone is
   // never evidence of a healthy birth or the absence of disease.
@@ -62,7 +62,7 @@ export function recordOverview(record: RecordContent): string {
     isClinicalConditionName(record.diagnosis)
       ? [record.diagnosis, record.summary || "", ...content]
       : [record.summary || "", record.diagnosis, ...content]
-  ).find(hasContent);
+  ).find(hasRecordContent);
   if (!overview)
     return "문서에 병명이나 상세 진료 내용이 기재되어 있지 않아요.";
   return overview.length > 180

@@ -438,3 +438,30 @@ test("a caregiver's dermatophytosis note cannot trigger a documented-disease fal
   assert.match(facts.current[0].text, /보호자 직접 기록/);
   assert.ok(!facts.current[0].text.includes("문서상 진단"));
 });
+
+test("recent caregiver notes cannot hide all older documented diagnoses", () => {
+  const clinical = {
+    ...context.records[0],
+    id: "important-history",
+    date: "2021-11-07",
+  };
+  const notes = Array.from({ length: 10 }, (_, index) => ({
+    id: `note-${index}`,
+    date: "2026-11-07",
+    source: "manual" as const,
+    diagnosis: `관찰 메모 ${index}`,
+    conditions: [],
+  }));
+  const facts = groundedFacts({ ...context, records: [...notes, clinical] });
+  assert.equal(facts.current.length, 8);
+  assert.ok(
+    facts.current.some(
+      (fact) =>
+        fact.sourceIds.includes("important-history") &&
+        fact.text.includes("문서상 진단"),
+    ),
+  );
+  assert.ok(
+    facts.current.some((fact) => fact.text.includes("보호자 직접 기록")),
+  );
+});

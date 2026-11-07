@@ -1,7 +1,7 @@
 type AiStage = 'inference' | 'decode' | 'validation' | 'grounding';
 
 export function logAiFailure(
-  feature: 'prescription' | 'briefing',
+  feature: 'prescription' | 'briefing' | 'chat',
   stage: AiStage,
   error: unknown,
 ) {

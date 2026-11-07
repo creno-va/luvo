@@ -4,7 +4,7 @@ import { briefings } from "./briefings.ts";
 
 function request(
   diagnosis = "피부사상균증",
-  output = { watch: [], questions: [], unknowns: [] },
+  output: unknown = { watch: [], questions: [], unknowns: [] },
   recordOverride: Partial<{
     summary: string;
     conditions: { name: string; status: string; note: string }[];
@@ -101,4 +101,27 @@ test("the API returns a birth-exam overview in place of an empty historical illn
   assert.deepEqual(data.current[0].sourceIds, ["record-2021"]);
   assert.ok(!JSON.stringify(data).includes("과거 병력"));
   assert.deepEqual(data.watch, []);
+});
+
+test("one invented model citation cannot suppress verified record facts and skin follow-up", async () => {
+  const response = await request("피부사상균증", {
+    watch: [
+      {
+        title: "근거 없는 항목",
+        possibility: "모델이 만든 근거 없는 가능성이에요.",
+        prepare: "원문에 없는 준비 내용은 표시하지 않아요.",
+        sourceIds: ["invented-record"],
+        referenceIds: ["invented-guide"],
+      },
+    ],
+    questions: [],
+    unknowns: [],
+  });
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.watch.length, 1);
+  assert.deepEqual(data.watch[0].sourceIds, ["record-2021"]);
+  assert.equal(data.references[0].id, "merck-dermatophytosis");
+  assert.ok(!JSON.stringify(data).includes("invented-"));
+  assert.match(data.unknowns.join(" "), /제외/);
 });

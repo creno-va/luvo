@@ -1,4 +1,7 @@
-import { isClinicalConditionName } from "./clinical-records.ts";
+import {
+  isClinicalConditionName,
+  hasRecordContent,
+} from "./clinical-records.ts";
 
 // Korean standard veterinary forms: layout labels are never patient values.
 const placeholders = new Set([
@@ -258,7 +261,7 @@ export function normalizeDocumentExtraction(
       const name = text(c.name, 120);
       return isClinicalConditionName(name)
         ? []
-        : [name, text(c.note, 500)].filter(Boolean);
+        : [name, text(c.note, 500)].filter(hasRecordContent);
     })
     .join(". ");
   const diagnosis =

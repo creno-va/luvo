@@ -16,7 +16,7 @@ export type RecordDraft = {
 };
 
 export function manualDraft(pet?: AppState, date = localDate()): RecordDraft {
-  const patient = pet;
+  const patient = pet && !pet.sample ? pet : undefined;
   return {
     manual: true,
     fingerprint: `manual:${uid()}`,

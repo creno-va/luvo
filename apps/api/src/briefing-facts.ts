@@ -145,27 +145,35 @@ export function groundedFacts(context: BriefContext) {
     text: `${condition.name}: ${statusLabel[condition.status]} (${record.date} 문서).${condition.note ? ` ${condition.note}` : ""}`,
     sourceIds: [record.id],
   }));
-  const current = records
-    .flatMap((record) => {
-      if (record.source === "manual")
-        return [
-          {
-            text: `${record.date} 보호자 직접 기록: ${(record.summary?.trim() || record.diagnosis.trim() || "관찰 내용이 기재되어 있지 않아요.").slice(0, 180)}`,
-            sourceIds: [record.id],
-          },
-        ];
-      if (record.conditions.some((c) => isClinicalConditionName(c.name)))
-        return conditionFacts.filter((fact) =>
-          fact.sourceIds.includes(record.id),
-        );
+  const recordFacts = records.flatMap((record) => {
+    if (record.source === "manual")
       return [
         {
-          text: `${record.date} 기록: ${recordOverview(record)}`,
+          text: `${record.date} 보호자 직접 기록: ${(record.summary?.trim() || record.diagnosis.trim() || "관찰 내용이 기재되어 있지 않아요.").slice(0, 180)}`,
           sourceIds: [record.id],
         },
       ];
-    })
-    .slice(0, 8);
+    if (record.conditions.some((c) => isClinicalConditionName(c.name)))
+      return conditionFacts.filter((fact) =>
+        fact.sourceIds.includes(record.id),
+      );
+    return [
+      {
+        text: `${record.date} 기록: ${recordOverview(record)}`,
+        sourceIds: [record.id],
+      },
+    ];
+  });
+  // Recent caregiver notes must not push all documented diagnoses out of the
+  // visible facts. Fill remaining places with other record types, preserving
+  // their document order without asserting a same-day clinical sequence.
+  const selected = new Set([
+    ...conditionFacts.slice(0, 8),
+    ...recordFacts
+      .filter((fact) => !conditionFacts.includes(fact))
+      .slice(0, Math.max(0, 8 - conditionFacts.length)),
+  ]);
+  const current = recordFacts.filter((fact) => selected.has(fact));
   const description = conditions.length
     ? conditions
         .slice(0, 3)

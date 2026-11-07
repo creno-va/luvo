@@ -10,22 +10,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
-export function DocumentOnboarding({
-  onUpload,
-  onSample,
-}: {
-  onUpload: () => void;
-  onSample: () => void;
-}) {
+export function DocumentOnboarding({ onUpload }: { onUpload: () => void }) {
   return (
     <main className="landing">
       <header className="landing-header">
         <a className="wordmark" href="/">
           luvo<span>•</span>
         </a>
-        <button onClick={onSample}>
-          먼저 둘러보기 <ArrowUpRight size={16} />
-        </button>
       </header>
       <aside className="landing-demo" aria-label="AI 시연 안내">
         <span className="landing-demo-icon" aria-hidden="true">
@@ -149,7 +140,7 @@ export function DocumentOnboarding({
               icon: CheckCheck,
               n: "02",
               title: "약을 먹인 뒤, 한 번의 체크",
-              text: "시간에 맞춰 먹였는지 체크하고, 쉬는 동안에는 토글만 꺼두세요.",
+              text: "먹인 약은 시간별로 체크해요. 복용 중단·재개는 약의 상태 버튼에서 기록해요.",
             },
             {
               icon: Sparkles,

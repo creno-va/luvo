@@ -363,3 +363,19 @@ test("dates alone cannot create a course length and excluded-field requests are 
   assert.equal(result.medications[0].durationDays, "");
   assert.ok(!result.warnings.some((w) => /중단일|생년월일/.test(w)));
 });
+
+test("discarded disease labels do not become a finding in an otherwise blank form", () => {
+  const result = normalize(
+    {
+      quality: "blank",
+      conditions: [
+        { name: "과거 병력", status: "history", note: "" },
+        { name: "병력", status: "history", note: "" },
+      ],
+    },
+    "diagnosis",
+  );
+  assert.deepEqual(result.conditions, []);
+  assert.equal(result.summary, "");
+  assert.equal(result.quality, "blank");
+});

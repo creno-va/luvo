@@ -12,10 +12,10 @@ import {
 import { writeState, readState, readFile } from "./storage.ts";
 import { timelineEntries } from "./chronology.ts";
 
-test("a selected sample dog prefills basic details without reusing its stored identity or health history", () => {
+test("removed sample data never populates a real manual record", () => {
   const draft = manualDraft(sampleState(), "2026-11-07");
   assert.equal(draft.file, undefined);
-  assert.equal(draft.extraction.animal.name, sampleState().profile.name);
+  assert.equal(draft.extraction.animal.name, "");
   assert.equal(draft.targetPetId, "new");
   assert.deepEqual(draft.extraction.conditions, []);
   assert.equal(draft.extraction.date, "2026-11-07");
