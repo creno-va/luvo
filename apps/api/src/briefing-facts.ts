@@ -1,4 +1,5 @@
 import { clinicalGuides } from "./clinical-guides.ts";
+import { isClinicalConditionName, recordOverview } from "./clinical-records.ts";
 
 type Condition = {
   name: string;
@@ -11,6 +12,7 @@ export type BriefContext = {
     id: string;
     date: string;
     diagnosis: string;
+    summary?: string;
     conditions: Condition[];
   }[];
   currentMedications: unknown[];
@@ -95,11 +97,15 @@ export function completeFollowUp(
   if (!questions.length) {
     for (const record of orderedRecords(context)) {
       for (const condition of record.conditions) {
+        if (!isClinicalConditionName(condition.name)) continue;
         questions.push(
           `${record.date} 문서의 ${condition.name}(${statusLabel[condition.status]})에 대해 현재 경과와 기존 재진 계획에서 확인할 점은 무엇인가요?`,
         );
       }
-      if (!questions.length && record.diagnosis.trim())
+      if (
+        !questions.length &&
+        (record.diagnosis.trim() || record.summary?.trim())
+      )
         questions.push(
           `${record.date} 문서에 적힌 진료 내용의 이후 경과와 기존 재진 계획에서 확인할 점은 무엇인가요?`,
         );
@@ -121,6 +127,7 @@ export function groundedFacts(context: BriefContext) {
   }[] = [];
   for (const record of records)
     for (const condition of record.conditions) {
+      if (!isClinicalConditionName(condition.name)) continue;
       const key = condition.name
         .normalize("NFKC")
         .replace(/\s/g, "")
@@ -130,15 +137,24 @@ export function groundedFacts(context: BriefContext) {
         conditions.push({ condition, record });
       }
     }
-  const current = conditions.slice(0, 4).map(({ condition, record }) => ({
+  const conditionFacts = conditions.map(({ condition, record }) => ({
     text: `${condition.name}: ${statusLabel[condition.status]} (${record.date} 문서).${condition.note ? ` ${condition.note}` : ""}`,
     sourceIds: [record.id],
   }));
-  if (!current.length && records[0]?.diagnosis)
-    current.push({
-      text: `${records[0].date} 진료 기록: ${records[0].diagnosis}`,
-      sourceIds: [records[0].id],
-    });
+  const current = records
+    .flatMap((record) => {
+      if (record.conditions.some((c) => isClinicalConditionName(c.name)))
+        return conditionFacts.filter((fact) =>
+          fact.sourceIds.includes(record.id),
+        );
+      return [
+        {
+          text: `${record.date} 기록: ${recordOverview(record)}`,
+          sourceIds: [record.id],
+        },
+      ];
+    })
+    .slice(0, 8);
   const description = conditions.length
     ? conditions
         .slice(0, 3)
@@ -149,9 +165,9 @@ export function groundedFacts(context: BriefContext) {
         .join(", ") +
       (conditions.length > 3 ? ` 외 ${conditions.length - 3}개` : "") +
       "이 기록되어 있어요."
-    : records[0]?.diagnosis
-      ? "최근 진료 내용과 이전 처방을 함께 보관하고 있어요."
-      : "현재 문서에는 확실한 진단명이 기재되어 있지 않아요.";
+    : records[0]
+      ? `${records[0].date} 진료 내용이 기록되어 있어요. ${recordOverview(records[0])}`
+      : "아직 정리할 진료 기록이 없어요.";
   return {
     summary: `${context.pet.name}의 문서에는 ${description} 현재 유효한 처방약은 ${context.currentMedications.length}개이고, 최근 확인된 투약 체크는 ${context.doseRecords.length}건이에요.`,
     current,
@@ -187,8 +203,13 @@ export function supportedWatch(
       return false;
     if (
       reference === "aaha-senior" &&
-      new Set(sources.flatMap((r) => r.conditions.map((c) => c.name))).size <
-        2 &&
+      new Set(
+        sources.flatMap((r) =>
+          r.conditions
+            .filter((c) => isClinicalConditionName(c.name))
+            .map((c) => c.name),
+        ),
+      ).size < 2 &&
       !/노령|senior|geriatric/i.test(text)
     )
       return false;

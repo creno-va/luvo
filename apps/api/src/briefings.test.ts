@@ -5,6 +5,10 @@ import { briefings } from "./briefings.ts";
 function request(
   diagnosis = "피부사상균증",
   output = { watch: [], questions: [], unknowns: [] },
+  recordOverride: Partial<{
+    summary: string;
+    conditions: { name: string; status: string; note: string }[];
+  }> = {},
 ) {
   const context = {
     pet: {
@@ -23,6 +27,7 @@ function request(
         diagnosis,
         summary: "",
         conditions: [{ name: diagnosis, status: "diagnosed", note: "" }],
+        ...recordOverride,
         medications: [],
       },
     ],
@@ -79,4 +84,21 @@ test("an unrelated diagnosis gets a visit question without skin guidance or an u
   assert.deepEqual(data.references, []);
   assert.match(data.questions[0], /외이염/);
   assert.ok(!JSON.stringify(data).includes("피부사상균증"));
+});
+
+test("the API returns a birth-exam overview in place of an empty historical illness", async () => {
+  const response = await request(
+    "신생자 검진상 임상적 특이 소견 없음",
+    undefined,
+    {
+      summary: "출생 당일 검진. 검진 시 활력 양호.",
+      conditions: [{ name: "", status: "history", note: "" }],
+    },
+  );
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.match(data.current[0].text, /출생 검진 양호 · 특이 소견 없음/);
+  assert.deepEqual(data.current[0].sourceIds, ["record-2021"]);
+  assert.ok(!JSON.stringify(data).includes("과거 병력"));
+  assert.deepEqual(data.watch, []);
 });

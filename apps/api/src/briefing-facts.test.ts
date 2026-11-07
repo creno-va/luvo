@@ -284,3 +284,112 @@ test("skin follow-up retains an existing question about another documented condi
   assert.equal(result.questions.length, 3);
   assert.ok(result.questions.includes(question));
 });
+
+const birthRecord = {
+  id: "birth",
+  date: "2020-11-07",
+  diagnosis: "신생자 검진상 임상적 특이 소견 없음",
+  summary:
+    "출생 당일 검진. 검진 시 활력 양호. 모든 선천성 질환을 배제한 것은 아님.",
+  conditions: [{ name: "", status: "history" as const, note: "" }],
+};
+
+test("a birth examination with an empty illness name is summarized as the documented finding", () => {
+  const facts = groundedFacts({
+    ...context,
+    records: [birthRecord],
+    currentMedications: [],
+  });
+  assert.equal(facts.current.length, 1);
+  assert.equal(
+    facts.current[0].text,
+    "2020-11-07 기록: 출생 검진 양호 · 특이 소견 없음.",
+  );
+  assert.deepEqual(facts.current[0].sourceIds, ["birth"]);
+  assert.match(facts.summary, /출생 검진 양호/);
+  assert.ok(!JSON.stringify(facts).includes("과거 병력"));
+});
+
+test("a non-disease birth record remains visible alongside later actual illnesses", () => {
+  const facts = groundedFacts({
+    ...context,
+    records: [...context.records, birthRecord],
+  });
+  assert.match(facts.current[1].text, /승모판 질환: 과거 병력/);
+  assert.match(facts.current[2].text, /출생 검진 양호/);
+  assert.deepEqual(facts.current[2].sourceIds, ["birth"]);
+  assert.ok(!facts.current.some((fact) => /^\s*:/.test(fact.text)));
+});
+
+test("an unnamed non-disease entry uses its record content without inferring health from a blank diagnosis", () => {
+  const facts = groundedFacts({
+    ...context,
+    records: [
+      {
+        id: "checkup",
+        date: "2020-11-07",
+        diagnosis: "",
+        summary: "체중 확인을 위한 정기 검진 기록",
+        conditions: [{ name: "", status: "history", note: "" }],
+      },
+    ],
+  });
+  assert.match(facts.current[0].text, /체중 확인을 위한 정기 검진 기록/);
+  assert.ok(!/과거 병력|양호|정상/.test(facts.current[0].text));
+  const empty = groundedFacts({
+    ...context,
+    records: [{ ...birthRecord, diagnosis: "", summary: "" }],
+  });
+  assert.match(empty.current[0].text, /상세 진료 내용이 기재되어 있지/);
+  assert.ok(!/양호|정상|과거 병력/.test(empty.summary));
+});
+
+test("newborn illnesses and legacy diagnosis text are not rewritten as a healthy birth", () => {
+  const illness = {
+    ...birthRecord,
+    diagnosis: "신생아 패혈증 의심",
+    summary: "그 밖의 임상적 특이 소견 없음",
+    conditions: [
+      { name: "신생아 패혈증", status: "suspected" as const, note: "" },
+    ],
+  };
+  assert.match(
+    groundedFacts({ ...context, records: [illness] }).current[0].text,
+    /신생아 패혈증: 의심 소견/,
+  );
+  const legacy = groundedFacts({
+    ...context,
+    records: [{ ...illness, conditions: [] }],
+  });
+  assert.match(legacy.current[0].text, /패혈증 의심/);
+  assert.ok(!JSON.stringify(legacy).includes("출생 검진 양호"));
+});
+
+test("empty history placeholders cannot turn one disease into multiple conditions for a senior-care citation", () => {
+  assert.equal(
+    supportedWatch(
+      {
+        title: "관찰",
+        possibility: "여러 질환을 함께 확인할 필요가 있어요.",
+        prepare: "기존 진료 기록을 준비해 주세요.",
+        sourceIds: ["one"],
+        referenceIds: ["aaha-senior"],
+      },
+      {
+        ...context,
+        records: [
+          {
+            id: "one",
+            date: "2026-11-07",
+            diagnosis: "외이염",
+            conditions: [
+              { name: "외이염", status: "diagnosed", note: "" },
+              { name: "", status: "history", note: "" },
+            ],
+          },
+        ],
+      },
+    ),
+    false,
+  );
+});

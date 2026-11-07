@@ -8,6 +8,62 @@ import {
   documentResponseSchema,
 } from "./document-extraction.ts";
 
+test("normal birth-exam findings remain record content rather than historical diseases", () => {
+  const result = normalize(
+    {
+      animal: { name: "모의 강아지", age: "출생 당일" },
+      date: "2020-11-07",
+      diagnosis: "신생자 검진상 임상적 특이 소견 없음",
+      summary: "출생 검진 양호 · 특이 소견 없음.",
+      conditions: [
+        { name: "", status: "history", note: "" },
+        {
+          name: "신생자 검진상 임상적 특이 소견 없음",
+          status: "history",
+          note: "",
+        },
+        { name: "정상 검진", status: "diagnosed", note: "" },
+      ],
+    },
+    "diagnosis",
+  );
+  assert.deepEqual(result.conditions, []);
+  assert.match(result.diagnosis, /특이 소견 없음/);
+  assert.equal(result.summary, "출생 검진 양호 · 특이 소견 없음.");
+  assert.equal(result.quality, "filled");
+});
+
+test("normal findings survive an omitted model summary and a real neonatal illness is retained", () => {
+  const record = normalize(
+    {
+      diagnosis: "",
+      conditions: [
+        { name: "건강 검진", status: "history", note: "검진 시 활력 양호" },
+      ],
+    },
+    "diagnosis",
+  );
+  assert.deepEqual(record.conditions, []);
+  assert.match(record.summary, /활력 양호/);
+  assert.equal(record.quality, "filled");
+  const illness = normalize(
+    {
+      diagnosis: "신생아 패혈증 의심",
+      conditions: [
+        {
+          name: "신생아 패혈증",
+          status: "suspected",
+          statusEvidence: "패혈증 의심",
+          note: "",
+        },
+      ],
+    },
+    "diagnosis",
+  );
+  assert.equal(illness.conditions[0].name, "신생아 패혈증");
+  assert.equal(illness.conditions[0].status, "suspected");
+});
+
 test("blank standard-form labels and unselected sex choices are never patient or drug values", () => {
   const result = normalize(
     {
