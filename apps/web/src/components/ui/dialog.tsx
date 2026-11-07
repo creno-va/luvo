@@ -1,7 +1,6 @@
 import { Dialog as Primitive } from "radix-ui";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import "@/styles/dialog.css";
 
 export const Dialog = Primitive.Root;
 export const DialogTitle = Primitive.Title;
