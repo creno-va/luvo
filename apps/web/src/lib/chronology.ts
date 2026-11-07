@@ -17,8 +17,15 @@ export function timelineEntries(state: AppState) {
     sortAt: doc.date,
     dateOnly: true,
     type: "document" as const,
-    title: `${doc.kind === "diagnosis" ? "진단서" : doc.kind === "prescription" ? "처방전" : "진료 기록"}`,
-    detail: `${doc.items.length}개의 약 · 서류에 적힌 진료일 기준`,
+    title:
+      doc.source === "manual"
+        ? "직접 입력한 건강 기록"
+        : doc.kind === "diagnosis"
+          ? "진단서"
+          : doc.kind === "prescription"
+            ? "처방전"
+            : "진료 기록",
+    detail: `${doc.items.length}개의 약 · ${doc.source === "manual" ? "직접 선택한 기록 날짜 기준" : "서류에 적힌 진료일 기준"}`,
     documentId: doc.id,
   }));
   const localMoment = (at: string) => {

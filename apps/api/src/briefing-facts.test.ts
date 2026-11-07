@@ -149,3 +149,31 @@ test("history alone is not evidence for relapse and does not create a new test o
   assert.ok(!groundedPreparation(item).includes("검사를 실시"));
   assert.match(groundedPreparation(item), /기록/);
 });
+
+test("manual observations retain attribution and cannot establish disease-specific watches", () => {
+  const manual = {
+    ...context,
+    records: [
+      {
+        id: "note",
+        date: "2026-11-07",
+        source: "manual" as const,
+        diagnosis: "신장질환인지 걱정됨",
+        conditions: [],
+      },
+    ],
+  };
+  assert.match(groundedFacts(manual).current[0].text, /보호자 직접 기록/);
+  assert.equal(
+    supportedWatch(
+      {
+        sourceIds: ["note"],
+        referenceIds: ["iris-kidney"],
+        possibility: "신장질환의 상태를 확인할 수 있습니다.",
+        prepare: "기존 기록을 준비해 주치의와 상담해 주세요.",
+      },
+      manual,
+    ),
+    false,
+  );
+});

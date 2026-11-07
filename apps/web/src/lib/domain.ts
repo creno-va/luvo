@@ -32,7 +32,8 @@ export type DocumentRecord = {
   id: string;
   fingerprint: string;
   filename: string;
-  kind?: "prescription" | "diagnosis";
+  kind?: "prescription" | "diagnosis" | "note";
+  source?: "photo" | "manual";
   dateSource?: "clinical" | "issued" | "unknown";
   date: string;
   diagnosis: string;
@@ -321,6 +322,8 @@ export function applyPrescription(
   source: DocumentRecord,
 ): AppState {
   const doc = documentFields(source);
+  if (doc.source === "manual" && !doc.diagnosis.trim() && !doc.items.length)
+    throw new Error("건강 기록이나 약 정보를 입력해 주세요.");
   if (state.documents.some((d) => d.fingerprint === doc.fingerprint))
     throw new Error("이미 등록한 문서예요. 진료 기록에서 확인할 수 있어요.");
   const error = validateItems(doc.items);
@@ -398,7 +401,7 @@ export function applyPrescription(
 export function profileDetail(profile: AppState["profile"]): string {
   return (
     [profile.breed, profile.sex, profile.age].filter(Boolean).join(" · ") ||
-    "문서에서 건강 기록을 이어가요"
+    "건강 기록을 함께 쌓아가요"
   );
 }
 export function sampleState(now = new Date()): AppState {
@@ -464,6 +467,7 @@ export function documentFields(doc: DocumentRecord): DocumentRecord {
     fingerprint: doc.fingerprint,
     filename: doc.filename,
     kind: doc.kind,
+    source: doc.source,
     dateSource: doc.dateSource,
     date: doc.date,
     diagnosis: doc.diagnosis,

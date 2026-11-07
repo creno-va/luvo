@@ -240,12 +240,12 @@ export default function LuvoApp() {
           analysisConsent: true,
         }));
       },
-      { id: doc.id, blob: draft.file },
+      draft.file ? { id: doc.id, blob: draft.file } : undefined,
     );
     if (ok) {
       if (previous) setUndo({ before: previous, documentId: doc.id });
       navigate("home");
-      setToast(`${doc.animal?.name || "우리 아이"}의 진료 기록을 정리했어요.`);
+      setToast(`${doc.animal?.name || "우리 아이"}의 건강 기록을 저장했어요.`);
     }
     return { ok };
   }
@@ -484,7 +484,7 @@ export default function LuvoApp() {
                   </span>
                   <div>
                     <strong>새로운 가족의 기록 시작하기</strong>
-                    <p>진단서나 처방전 사진으로 등록해요.</p>
+                    <p>사진을 올리거나 직접 입력해 등록해요.</p>
                   </div>
                   <ArrowUpRight size={21} />
                 </button>
@@ -503,7 +503,7 @@ export default function LuvoApp() {
                   back={back}
                 />
                 <p className="page-intro">
-                  서류에 적힌 진료 날짜와 시간으로 이어지는 기록.
+                  기록 날짜로 이어지는 진료 내용과 건강 메모.
                 </p>
                 <HealthPeriods pet={pet} />
                 <div className="section-top timeline-heading">
@@ -527,15 +527,15 @@ export default function LuvoApp() {
             <div>
               <span>
                 <FileText size={20} />
-                <strong>병원 기록, 잊기 전에.</strong>
-                <small>사진 한 장으로 이어가요</small>
+                <strong>오늘의 건강, 잊기 전에.</strong>
+                <small>사진이나 메모로 이어가요</small>
               </span>
               <button
                 className="primary-action"
                 onClick={() => setUpload(true)}
               >
                 <Plus size={21} />
-                <span>처방전 / 진단서 업로드</span>
+                <span>건강 기록 추가</span>
                 <ArrowUpRight size={20} />
               </button>
             </div>
@@ -563,14 +563,14 @@ export default function LuvoApp() {
       <DocumentSheet document={document} onClose={() => setDocument(null)} />
       {undo && !upload && (
         <div className="undo-strip">
-          <span>진료 기록을 추가했어요</span>
+          <span>건강 기록을 추가했어요</span>
           <button
             onClick={async () => {
               const entry = undo;
               if (
                 await persist(() => entry.before, undefined, entry.documentId)
               ) {
-                setToast("방금 추가한 문서를 되돌렸어요.");
+                setToast("방금 추가한 기록을 되돌렸어요.");
                 setUndo(null);
               }
             }}
@@ -643,8 +643,8 @@ function Briefing({
           onClick={() => onDocument(d)}
         >
           <FileText size={12} />
-          {d.date.slice(5).replace("-", ".")}
-          {" "}진료 기록 <ArrowUpRight size={12} />
+          {d.date.slice(5).replace("-", ".")} 진료 기록{" "}
+          <ArrowUpRight size={12} />
         </button>
       ));
   return (
@@ -688,7 +688,7 @@ function Briefing({
               ? brief.summary
               : analysis.loading
                 ? "새 진료 내용과 이전 병력을 연결하고 있어요. 잠시만 기다려 주세요."
-                : "첫 진료 기록이 도착했어요. 쌓인 병력과 처방을 함께 살펴볼게요."}
+                : "첫 건강 기록이 도착했어요. 쌓인 기록과 처방을 함께 살펴볼게요."}
         </p>
         <div className="brief-hero-bottom">
           <span className="hero-paw">
@@ -701,7 +701,7 @@ function Briefing({
                 ? "새로운 기록 분석 중"
                 : brief
                   ? `${clock(brief.generatedAt)} 분석`
-                  : "문서와 투약 기록을 바탕으로"}
+                  : "건강 기록과 투약 기록을 바탕으로"}
           </span>
           <Activity size={25} />
         </div>
@@ -948,7 +948,7 @@ function MedicationList({
           <h3>이날의 처방약이 없어요</h3>
           <p>
             처방 기간이 시작되면 이곳에 나타나요.
-            <br />새 처방을 받았다면 문서로 이어주세요.
+            <br />새 처방을 받았다면 건강 기록을 추가해 주세요.
           </p>
         </div>
       )}
@@ -996,9 +996,7 @@ function Timeline({
               </span>
               <div>
                 <time>
-                  {event.type === "document"
-                    ? event.at
-                    : clock(event.at)}
+                  {event.type === "document" ? event.at : clock(event.at)}
                 </time>
                 {doc ? (
                   <button onClick={() => onDocument(doc)}>
@@ -1012,6 +1010,7 @@ function Timeline({
                 {doc && (
                   <div className="timeline-tags">
                     {doc.dateSource === "issued" && <span>발급일 기준</span>}
+                    {doc.source === "manual" && <span>직접 입력</span>}
                     {doc.conditions?.slice(0, 2).map((c, i) => (
                       <span key={i}>{c.name}</span>
                     ))}
@@ -1222,7 +1221,7 @@ function DocumentSheet({
   useEffect(() => {
     setSource("");
     setError("");
-    if (!doc || doc.sample) return;
+    if (!doc || doc.sample || doc.source === "manual") return;
     let cancelled = false;
     let url = "";
     readFile(doc.id)
@@ -1251,7 +1250,9 @@ function DocumentSheet({
         <DialogTitle className="sheet-title">
           {doc?.kind === "diagnosis"
             ? "진단서"
-            : doc?.kind === "prescription" ? "처방전" : "진료 기록"}
+            : doc?.kind === "prescription"
+              ? "처방전"
+              : "건강 기록"}
         </DialogTitle>
         <DialogDescription className="sheet-description">
           {doc ? documentDateLabel(doc) : ""}
@@ -1283,7 +1284,10 @@ function DocumentSheet({
               </div>
             ) : null}
             {doc.animal?.weight && (
-              <p className="document-uploaded">문서상 체중 {doc.animal.weight}</p>
+              <p className="document-uploaded">
+                {doc.source === "manual" ? "체중" : "문서상 체중"}{" "}
+                {doc.animal.weight}
+              </p>
             )}
             <div className="document-prescriptions">
               {doc.items.map((item, i) => (
@@ -1328,12 +1332,14 @@ function DocumentSheet({
               <p className="document-source-note">
                 {doc.sample
                   ? "가상의 샘플 문서예요."
-                  : error || "원본 사진을 불러오는 중이에요."}
+                  : doc.source === "manual"
+                    ? "직접 입력한 건강 기록이에요. 첨부 사진은 없어요."
+                    : error || "원본 사진을 불러오는 중이에요."}
               </p>
             )}
             <p className="document-uploaded">
-              업로드 {clock(doc.createdAt)} · 타임라인은 서류 기준일·시각
-              기준이에요.
+              {doc.source === "manual" ? "작성" : "업로드"}{" "}
+              {clock(doc.createdAt)} · 기록 날짜 기준으로 표시해요.
             </p>
           </>
         )}

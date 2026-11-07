@@ -10,6 +10,8 @@ import {
   ImagePlus,
   LoaderCircle,
   Pill,
+  PenLine,
+  ArrowRight,
   Plus,
   RotateCcw,
   ShieldCheck,
@@ -27,7 +29,6 @@ import { Input } from "./ui/input";
 import { cn } from "@/lib/utils";
 import {
   isDate,
-  uid,
   validateItems,
   type AppState,
   type DocumentRecord,
@@ -38,14 +39,12 @@ import { fingerprint } from "@/lib/storage";
 import { analysisViews } from "@/lib/image";
 import { resolvePatient } from "@/lib/household";
 import { formatDoseTime } from "@/lib/prescription-review";
-export type Draft = {
-  extraction: Extraction;
-  file: File;
-  fingerprint: string;
-  manual: boolean;
-  targetPetId?: string;
-  documentKind?: "prescription" | "diagnosis";
-};
+import {
+  manualDraft,
+  draftDocument,
+  type RecordDraft,
+} from "@/lib/health-record";
+export type Draft = RecordDraft;
 const blankItem = (): PrescriptionItem => ({
   name: "",
   dose: "",
@@ -99,7 +98,7 @@ export function DocumentUpload({
     }
   }, [open]);
   useEffect(() => {
-    if (!draft) {
+    if (!draft?.file) {
       setPreview(null);
       return;
     }
@@ -246,21 +245,15 @@ export function DocumentUpload({
       setStep("review");
     }
   }
-  function makeDocument(value: Draft): DocumentRecord {
-    return {
-      id: uid(),
-      fingerprint: value.fingerprint,
-      filename: value.file.name,
-      date: value.extraction.date,
-      diagnosis: value.extraction.diagnosis,
-      summary: value.manual ? "" : value.extraction.summary,
-      items: value.extraction.medications,
-      animal: value.extraction.animal,
-      conditions: value.extraction.conditions.filter((c) => c.name.trim()),
-      createdAt: new Date().toISOString(),
-      kind: value.documentKind,
-      dateSource: value.extraction.dateSource,
-    };
+  function startManual() {
+    operation.current++;
+    request.current?.abort();
+    queue.current = [];
+    setError("");
+    setDraft(
+      manualDraft(pets.find((pet) => pet.id === state.id && !pet.sample)),
+    );
+    setStep("review");
   }
   function updateExtraction(change: Partial<Extraction>) {
     setDraft((d) =>
@@ -320,13 +313,21 @@ export function DocumentUpload({
       setError(route.reason);
       return;
     }
+    if (
+      !draft.file &&
+      !draft.extraction.diagnosis.trim() &&
+      !draft.extraction.medications.length
+    ) {
+      setError("건강 기록이나 약 정보를 입력해 주세요.");
+      return;
+    }
     const issue = validateItems(draft.extraction.medications);
     if (issue || !isDate(draft.extraction.date)) {
-      setError(issue || "서류 날짜를 확인해 주세요.");
+      setError(issue || "기록 날짜를 확인해 주세요.");
       return;
     }
     setError("");
-    const result = await onSaved(draft, makeDocument(draft));
+    const result = await onSaved(draft, draftDocument(draft));
     if (result.ok) {
       setCompleted((n) => n + 1);
       await nextFile();
@@ -345,25 +346,33 @@ export function DocumentUpload({
         className={cn("upload-dialog", step === "review" && "review-dialog")}
       >
         <div className="modal-icon">
-          <FilePlus2 size={25} />
+          {draft && !draft.file ? (
+            <PenLine size={25} />
+          ) : (
+            <FilePlus2 size={25} />
+          )}
         </div>
         <DialogTitle className="modal-title">
           {step === "pick"
-            ? "병원에 다녀왔나요?"
+            ? "건강 기록 추가"
             : step === "analyzing"
               ? "진료 기록을 읽고 있어요"
-              : draft?.manual
-                ? "사진을 보며 기록해 주세요"
-                : "읽은 내용을 확인해 주세요"}
+              : draft && !draft.file
+                ? "건강 기록 직접 입력"
+                : draft?.manual
+                  ? "사진을 보며 기록해 주세요"
+                  : "읽은 내용을 확인해 주세요"}
         </DialogTitle>
         <DialogDescription className="modal-description">
           {step === "pick"
-            ? "받아온 문서를 넣어주세요. 한 장만 있어도 괜찮아요."
+            ? "사진을 올리거나, 사진 없이 직접 입력해 주세요."
             : step === "analyzing"
               ? "문서에 적힌 내용을 차근차근 확인하고 있어요."
-              : draft?.manual
-                ? "자동 분석을 완료하지 못했어요. 직접 입력한 내용으로 저장돼요."
-                : "사진에서 읽은 값을 채웠어요. 확인한 뒤 저장해 주세요."}
+              : draft && !draft.file
+                ? "관찰한 내용이나 진료 메모를 남겨주세요. 약도 함께 기록할 수 있어요."
+                : draft?.manual
+                  ? "자동 분석을 완료하지 못했어요. 직접 입력한 내용으로 저장돼요."
+                  : "사진에서 읽은 값을 채웠어요. 확인한 뒤 저장해 주세요."}
         </DialogDescription>
         {completed > 0 && (
           <p className="batch-progress" role="status">
@@ -374,9 +383,24 @@ export function DocumentUpload({
           <>
             {state.sample && (
               <p className="sample-upload-note">
-                사진을 등록하면 샘플을 비우고 내 기록으로 시작해요.
+                새 기록을 저장하면 샘플을 비우고 내 기록으로 시작해요.
               </p>
             )}
+            <button
+              type="button"
+              className="record-input-option"
+              onClick={startManual}
+            >
+              <span className="record-input-icon">
+                <PenLine size={22} />
+              </span>
+              <span>
+                <strong>직접 입력</strong>
+                <small>사진 없이 건강 메모와 약 정보를 남겨요</small>
+              </span>
+              <ArrowRight size={20} />
+            </button>
+            <p className="record-photo-label">사진으로 등록하기</p>
             <div className="document-slots">
               {(["prescription", "diagnosis"] as const).map((key) => (
                 <div
@@ -508,28 +532,50 @@ export function DocumentUpload({
         )}
         {step === "review" && draft && (
           <>
-            <div
-              className={`ocr-result-banner quality-${draft.extraction.quality || "filled"}`}
-              role="status"
-            >
-              <FileText size={18} />
-              <div>
-                <strong>
-                  {draft.extraction.quality === "blank"
-                    ? "기입된 값이 없는 양식이에요"
-                    : draft.extraction.quality === "partial"
-                      ? "일부만 확인된 문서예요"
-                      : draft.manual
-                        ? "직접 확인할 수 있게 준비했어요"
-                        : "문서에서 읽은 값을 채웠어요"}
-                </strong>
+            {draft.file ? (
+              <div
+                className={`ocr-result-banner quality-${draft.extraction.quality || "filled"}`}
+                role="status"
+              >
+                <FileText size={18} />
+                <div>
+                  <strong>
+                    {draft.extraction.quality === "blank"
+                      ? "기입된 값이 없는 양식이에요"
+                      : draft.extraction.quality === "partial"
+                        ? "일부만 확인된 문서예요"
+                        : draft.manual
+                          ? "직접 확인할 수 있게 준비했어요"
+                          : "문서에서 읽은 값을 채웠어요"}
+                  </strong>
+                  <p>
+                    {draft.extraction.quality === "blank"
+                      ? "인쇄된 항목명은 값으로 채우지 않았어요. 기입된 서류를 다시 올리거나 직접 입력해 주세요."
+                      : "원본과 비교하고, 빈칸이나 잘못 읽은 항목을 수정해 주세요. 아직 저장되지 않았어요."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="manual-record-notice">
+                <span>
+                  <PenLine size={16} /> 직접 입력
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(null);
+                    setStep("pick");
+                    setError("");
+                  }}
+                >
+                  입력 방식 바꾸기
+                </button>
                 <p>
-                  {draft.extraction.quality === "blank"
-                    ? "인쇄된 항목명은 값으로 채우지 않았어요. 기입된 서류를 다시 올리거나 직접 입력해 주세요."
-                    : "원본과 비교하고, 빈칸이나 잘못 읽은 항목을 수정해 주세요. 아직 저장되지 않았어요."}
+                  기록은 이 브라우저에 저장되고, 건강 브리핑을 위해 Cloudflare
+                  AI로 분석해요.
                 </p>
               </div>
-            </div>
+            )}
             {preview && (
               <details className="ocr-compare">
                 <summary>
@@ -543,116 +589,140 @@ export function DocumentUpload({
             <div className="patient-review">
               <h3>
                 <Dog size={17} />
-                문서에서 읽은 강아지 정보
+                {draft.file ? "문서에서 읽은 강아지 정보" : "기록할 강아지"}
               </h3>
-              <div className="review-fields">
-                <label>
-                  강아지 이름
-                  <Input
-                    value={draft.extraction.animal.name}
-                    onChange={(e) =>
-                      updateExtraction({
-                        animal: {
-                          ...draft.extraction.animal,
-                          name: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="보호자 이름이 아닌 강아지 이름"
-                    maxLength={80}
-                  />
-                </label>
-                <label>
-                  품종
-                  <Input
-                    value={draft.extraction.animal.breed}
-                    onChange={(e) =>
-                      updateExtraction({
-                        animal: {
-                          ...draft.extraction.animal,
-                          breed: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="문서에 없으면 비워두세요"
-                    maxLength={80}
-                  />
-                </label>
-              </div>
-              <div className="review-fields">
-                <label>
-                  성별
-                  <Input
-                    value={draft.extraction.animal.sex}
-                    onChange={(e) =>
-                      updateExtraction({
-                        animal: {
-                          ...draft.extraction.animal,
-                          sex: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="수컷 / 암컷"
-                    maxLength={30}
-                  />
-                </label>
-                <label>
-                  문서상 나이
-                  <Input
-                    value={draft.extraction.animal.age}
-                    onChange={(e) =>
-                      updateExtraction({
-                        animal: {
-                          ...draft.extraction.animal,
-                          age: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="예: 7세"
-                    maxLength={60}
-                  />
-                </label>
-              </div>
-              <div className="review-fields">
-                <label>
-                  체중
-                  <Input
-                    value={draft.extraction.animal.weight || ""}
-                    onChange={(e) =>
-                      updateExtraction({
-                        animal: {
-                          ...draft.extraction.animal,
-                          weight: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="예: 4.2 kg · 기재된 경우만"
-                    maxLength={40}
-                  />
-                </label>
-              </div>
-
+              {(draft.file ||
+                !draft.targetPetId ||
+                draft.targetPetId === "new") && (
+                <>
+                  <div className="review-fields">
+                    <label>
+                      강아지 이름
+                      <Input
+                        value={draft.extraction.animal.name}
+                        onChange={(e) =>
+                          updateExtraction({
+                            animal: {
+                              ...draft.extraction.animal,
+                              name: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="보호자 이름이 아닌 강아지 이름"
+                        maxLength={80}
+                      />
+                    </label>
+                    <label>
+                      품종
+                      <Input
+                        value={draft.extraction.animal.breed}
+                        onChange={(e) =>
+                          updateExtraction({
+                            animal: {
+                              ...draft.extraction.animal,
+                              breed: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder={
+                          draft.file
+                            ? "문서에 없으면 비워두세요"
+                            : "품종 · 선택"
+                        }
+                        maxLength={80}
+                      />
+                    </label>
+                  </div>
+                  <div className="review-fields">
+                    <label>
+                      성별
+                      <Input
+                        value={draft.extraction.animal.sex}
+                        onChange={(e) =>
+                          updateExtraction({
+                            animal: {
+                              ...draft.extraction.animal,
+                              sex: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="수컷 / 암컷"
+                        maxLength={30}
+                      />
+                    </label>
+                    <label>
+                      문서상 나이
+                      <Input
+                        value={draft.extraction.animal.age}
+                        onChange={(e) =>
+                          updateExtraction({
+                            animal: {
+                              ...draft.extraction.animal,
+                              age: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="예: 7세"
+                        maxLength={60}
+                      />
+                    </label>
+                  </div>
+                  <div className="review-fields">
+                    <label>
+                      체중
+                      <Input
+                        value={draft.extraction.animal.weight || ""}
+                        onChange={(e) =>
+                          updateExtraction({
+                            animal: {
+                              ...draft.extraction.animal,
+                              weight: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder={
+                          draft.file
+                            ? "예: 4.2 kg · 기재된 경우만"
+                            : "예: 4.2 kg · 선택"
+                        }
+                        maxLength={40}
+                      />
+                    </label>
+                  </div>
+                </>
+              )}
               {pets.filter((p) => !p.sample).length > 0 && (
                 <label className="field-label">
                   이 기록을 연결할 강아지
                   <select
                     className="patient-target"
                     value={draft.targetPetId || "auto"}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const target = e.target.value;
                       setDraft((d) =>
                         d
                           ? {
                               ...d,
                               targetPetId:
-                                e.target.value === "auto"
-                                  ? undefined
-                                  : e.target.value,
+                                target === "auto" ? undefined : target,
+                              ...(!d.file
+                                ? {
+                                    extraction: {
+                                      ...d.extraction,
+                                      animal: manualDraft(
+                                        pets.find((p) => p.id === target),
+                                      ).extraction.animal,
+                                    },
+                                  }
+                                : {}),
                             }
                           : d,
-                      )
-                    }
+                      );
+                    }}
                   >
-                    <option value="auto">문서 정보로 자동 연결</option>
+                    {draft.file && (
+                      <option value="auto">문서 정보로 자동 연결</option>
+                    )}
                     {pets
                       .filter((p) => !p.sample)
                       .map((p) => (
@@ -665,23 +735,25 @@ export function DocumentUpload({
                 </label>
               )}
             </div>
-            <div className="review-source">
-              {preview && <img src={preview} alt="업로드한 처방전" />}
-              <div>
-                <strong>{draft.file.name}</strong>
-                <span>{draft.manual ? "직접 입력" : "AI가 읽은 문서"}</span>
+            {draft.file && (
+              <div className="review-source">
+                {preview && <img src={preview} alt="업로드한 처방전" />}
+                <div>
+                  <strong>{draft.file.name}</strong>
+                  <span>{draft.manual ? "직접 입력" : "AI가 읽은 문서"}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setStep("pick");
+                    setDraft(null);
+                    setError("");
+                  }}
+                  aria-label="다른 사진 선택"
+                >
+                  <RotateCcw size={17} />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setStep("pick");
-                  setDraft(null);
-                  setError("");
-                }}
-                aria-label="다른 사진 선택"
-              >
-                <RotateCcw size={17} />
-              </button>
-            </div>
+            )}
             {draft.extraction.warnings.length > 0 && (
               <div className="review-warnings">
                 {draft.extraction.warnings.map((warning, i) => (
@@ -694,7 +766,9 @@ export function DocumentUpload({
             )}
             <div className="review-fields">
               <label>
-                서류 기준일 · 진단/처방일 또는 발급일
+                {draft.file
+                  ? "서류 기준일 · 진단/처방일 또는 발급일"
+                  : "기록 날짜"}
                 <Input
                   type="date"
                   value={draft.extraction.date}
@@ -703,14 +777,27 @@ export function DocumentUpload({
               </label>
             </div>
             <label className="field-label">
-              병명·진단 내용 <span>선택</span>
+              {draft.file ? (
+                <>
+                  병명·진단 내용 <span>선택</span>
+                </>
+              ) : (
+                <>
+                  건강 기록 <span>약만 기록할 때는 선택</span>
+                </>
+              )}
               <textarea
                 className="ocr-textarea"
                 value={draft.extraction.diagnosis}
                 onChange={(e) =>
                   updateExtraction({ diagnosis: e.target.value })
                 }
-                placeholder="문서에 적힌 내용을 남겨주세요"
+                placeholder={
+                  draft.file
+                    ? "문서에 적힌 내용을 남겨주세요"
+                    : "오늘 관찰한 증상, 진료 내용, 특이사항을 적어주세요"
+                }
+                maxLength={1000}
               />
             </label>
             {draft.extraction.conditions.length > 0 && (
@@ -793,7 +880,9 @@ export function DocumentUpload({
                     <Input
                       value={item.name}
                       onChange={(e) => updateItem(i, { name: e.target.value })}
-                      placeholder="처방전에 적힌 약 이름"
+                      placeholder={
+                        draft.file ? "처방전에 적힌 약 이름" : "기록할 약 이름"
+                      }
                       maxLength={100}
                     />
                   </label>
@@ -820,7 +909,8 @@ export function DocumentUpload({
                   }
                 >
                   <summary>
-                    처방전 원문 항목 <ChevronDown size={15} />
+                    {draft.file ? "처방전 원문 항목" : "약 상세 정보"}{" "}
+                    <ChevronDown size={15} />
                   </summary>
                   <div className="review-fields">
                     {(
@@ -847,7 +937,7 @@ export function DocumentUpload({
                   </div>
                 </details>
                 <p className="ocr-time-note">
-                  일정은 서류 날짜부터 연결하며, 처방일수가 있으면 기간을 자동
+                  일정은 기록 날짜부터 연결하며, 처방일수가 있으면 기간을 자동
                   계산해요.
                 </p>
                 <label className="field-label">

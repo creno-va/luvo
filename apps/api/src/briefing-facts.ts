@@ -8,6 +8,7 @@ export type BriefContext = {
   records: {
     id: string;
     date: string;
+    source?: "photo" | "manual";
     diagnosis: string;
     conditions: Condition[];
   }[];
@@ -30,7 +31,9 @@ export function groundedFacts(context: BriefContext) {
     record: (typeof records)[number];
   }[] = [];
   for (const record of records)
-    for (const condition of record.conditions) {
+    for (const condition of record.source === "manual"
+      ? []
+      : record.conditions) {
       const key = condition.name
         .normalize("NFKC")
         .replace(/\s/g, "")
@@ -46,7 +49,7 @@ export function groundedFacts(context: BriefContext) {
   }));
   if (!current.length && records[0]?.diagnosis)
     current.push({
-      text: `${records[0].date} 진료 기록: ${records[0].diagnosis}`,
+      text: `${records[0].date} ${records[0].source === "manual" ? "보호자 직접 기록" : "진료 기록"}: ${records[0].diagnosis}`,
       sourceIds: [records[0].id],
     });
   const description = conditions.length
@@ -60,10 +63,12 @@ export function groundedFacts(context: BriefContext) {
       (conditions.length > 3 ? ` 외 ${conditions.length - 3}개` : "") +
       "이 기록되어 있어요."
     : records[0]?.diagnosis
-      ? "최근 진료 내용과 이전 처방을 함께 보관하고 있어요."
-      : "현재 문서에는 확실한 진단명이 기재되어 있지 않아요.";
+      ? records[0].source === "manual"
+        ? "보호자가 직접 남긴 건강 관찰과 메모를 보관하고 있어요."
+        : "최근 진료 내용과 이전 처방을 함께 보관하고 있어요."
+      : "현재 기록에는 확실한 진단명이 기재되어 있지 않아요.";
   return {
-    summary: `${context.pet.name}의 문서에는 ${description} 현재 유효한 처방약은 ${context.currentMedications.length}개이고, 최근 확인된 투약 체크는 ${context.doseRecords.length}건이에요.`,
+    summary: `${context.pet.name}의 건강 기록에는 ${description} 현재 유효한 처방약은 ${context.currentMedications.length}개이고, 최근 확인된 투약 체크는 ${context.doseRecords.length}건이에요.`,
     current,
   };
 }
@@ -80,15 +85,20 @@ export function supportedWatch(
   const sources = context.records.filter((r) => item.sourceIds.includes(r.id));
   if (!sources.length || sources.length !== new Set(item.sourceIds).size)
     return false;
-  const text = JSON.stringify(sources);
+  // A caregiver note can provide observations but cannot establish a disease.
+  const clinicalSources = sources.filter(
+    (record) => record.source !== "manual",
+  );
+  if (!clinicalSources.length) return false;
+  const text = JSON.stringify(clinicalSources);
   const meds = JSON.stringify(context.currentMedications);
   if (/재발/.test((item.title || "") + item.possibility) && !/재발/.test(text))
     return false;
   for (const reference of item.referenceIds) {
     if (
       reference === "aaha-senior" &&
-      new Set(sources.flatMap((r) => r.conditions.map((c) => c.name))).size <
-        2 &&
+      new Set(clinicalSources.flatMap((r) => r.conditions.map((c) => c.name)))
+        .size < 2 &&
       !/노령|senior|geriatric/i.test(text)
     )
       return false;

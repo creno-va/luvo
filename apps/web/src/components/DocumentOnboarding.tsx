@@ -37,7 +37,9 @@ export function DocumentOnboarding({
             지우 대표님 검토를 위한 <strong>크레노바 첫 AI 시연</strong>
           </p>
         </div>
-        <span className="landing-demo-number" aria-hidden="true">01</span>
+        <span className="landing-demo-number" aria-hidden="true">
+          01
+        </span>
       </aside>
       <section className="landing-hero">
         <div className="landing-copy">
@@ -58,7 +60,7 @@ export function DocumentOnboarding({
             작은 기록을 이어 우리 아이의 내일을 준비해요.
           </p>
           <Button size="lg" className="landing-cta" onClick={onUpload}>
-            사진 한 장으로 시작하기 <ArrowUpRight size={22} />
+            건강 기록 시작하기 <ArrowUpRight size={22} />
           </Button>
           <span className="landing-hint">
             로그인 없이 가볍게 · 기록은 내 브라우저에
@@ -141,7 +143,7 @@ export function DocumentOnboarding({
               icon: FileText,
               n: "01",
               title: "병원에 다녀오면, 사진 한 장",
-              text: "진단서·처방전을 올려주세요. 아이의 정보부터 병력과 약까지 읽어 정리해요.",
+              text: "진단서·처방전을 올리거나 직접 입력해요. 아이의 병력과 약을 한곳에 모아요.",
             },
             {
               icon: CheckCheck,
@@ -172,9 +174,9 @@ export function DocumentOnboarding({
           <Heart size={24} />
         </span>
         <h2>오늘부터 쌓아볼까요?</h2>
-        <p>우리 아이의 첫 기록은, 사진 한 장이면 돼요.</p>
+        <p>사진 한 장이나 짧은 메모로 첫 기록을 남겨요.</p>
         <Button size="lg" onClick={onUpload}>
-          첫 진료 기록 남기기 <Plus size={21} />
+          첫 건강 기록 남기기 <Plus size={21} />
         </Button>
         <small>
           사진과 건강 기록은 Cloudflare AI로 분석하며,
