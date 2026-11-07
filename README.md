@@ -68,11 +68,48 @@ npm run deploy
 Custom Domain 설정에 따라 Wrangler가 `luvo.baro.site`의 DNS와 인증서를 관리합니다.
 `baro.site`가 같은 Cloudflare 계정의 활성 Zone이어야 합니다.
 
+## CI/CD
+
+`main`에 push하면 `.github/workflows/deploy.yml`이 다음 순서로 운영 배포합니다.
+GitHub Actions의 **Deploy production → Run workflow**에서도 `main` 배포를 수동 실행할 수 있습니다.
+
+1. 잠금 파일 기준 의존성 설치 (`npm ci`)
+2. 전체 타입 검사 및 Drizzle 스키마와 커밋된 마이그레이션의 일치 여부 확인
+3. 임시 로컬 D1에 마이그레이션을 적용하여 SQL 검증
+4. Astro 웹 빌드
+5. 운영 D1에 아직 적용하지 않은 마이그레이션 적용
+6. Hono API Worker → Astro 웹 Worker 순서로 배포
+7. 운영 웹, API 상태, Drizzle을 통한 D1 연결 확인 (`npm run smoke`)
+
+검증이나 마이그레이션이 실패하면 이후 배포 단계는 실행하지 않습니다.
+운영 배포는 직렬 실행하며, 새 push가 진행 중인 마이그레이션/배포를 취소하지 않습니다.
+배포 실패 시 이미 적용된 DB 마이그레이션은 자동 롤백하지 않습니다.
+스키마 변경은 기존 API와도 호환되게 추가하고, 컬럼 삭제 등의 제거 작업은 별도 배포로 진행합니다.
+
+### 배포 인증
+
+저장소 **Settings → Secrets and variables → Actions**에 다음 Repository secret이 필요합니다.
+
+- `CLOUDFLARE_API_TOKEN`: 운영 배포 전용 Cloudflare API 토큰
+
+토큰은 현재 Cloudflare 계정으로 범위를 제한하고, 다음 권한을 설정합니다.
+
+- Account → Workers Scripts → Edit
+- Account → D1 → Edit
+- Zone → Workers Routes → Edit (`baro.site`만 포함)
+- Zone → Zone → Read (`baro.site`만 포함)
+
+계정 ID와 D1 ID는 각 Wrangler 설정을 사용하며, 토큰은 소스에 저장하지 않습니다.
+토큰을 교체할 때는 GitHub의 `CLOUDFLARE_API_TOKEN` secret을 갱신합니다.
+마이그레이션 파일은 로컬에서 생성하여 SQL과 `meta/`를 함께 커밋해야 합니다.
+CI에서는 운영용 마이그레이션을 자동 생성하지 않습니다.
+
 ## 상태 확인
 
 ```sh
 curl https://luvo.baro.site/api/health
 curl https://luvo.baro.site/api/health/db
+npm run smoke
 ```
 
 `/api/health/db`는 Drizzle로 실제 D1 테이블을 조회하며 DB 또는 마이그레이션에 문제가 있으면 503을 반환합니다.
