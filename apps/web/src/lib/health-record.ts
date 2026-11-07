@@ -21,7 +21,7 @@ export function manualDraft(pet?: AppState, date = localDate()): RecordDraft {
     manual: true,
     fingerprint: `manual:${uid()}`,
     documentKind: "note",
-    targetPetId: patient?.id,
+    targetPetId: patient && !patient.sample ? patient.id : "new",
     extraction: {
       date,
       diagnosis: "",

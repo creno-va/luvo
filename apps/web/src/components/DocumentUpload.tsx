@@ -54,6 +54,7 @@ export function DocumentUpload({
   open,
   onOpenChange,
   state,
+  initialPetId,
   pets,
   saving,
   onSaved,
@@ -61,6 +62,7 @@ export function DocumentUpload({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   state: AppState;
+  initialPetId?: string;
   pets: AppState[];
   saving: boolean;
   onSaved: (draft: Draft, document: DocumentRecord) => Promise<{ ok: boolean }>;
@@ -250,9 +252,7 @@ export function DocumentUpload({
     request.current?.abort();
     queue.current = [];
     setError("");
-    setDraft(
-      manualDraft(pets.find((pet) => pet.id === state.id && !pet.sample)),
-    );
+    setDraft(manualDraft(pets.find((pet) => pet.id === initialPetId)));
     setStep("review");
   }
   function updateExtraction(change: Partial<Extraction>) {
@@ -343,6 +343,7 @@ export function DocumentUpload({
     >
       <DialogContent
         variant="sheet"
+        scrollResetKey={`${step}:${draft?.fingerprint ?? ""}`}
         className={cn("upload-dialog", step === "review" && "review-dialog")}
       >
         <div className="modal-icon">
@@ -591,106 +592,100 @@ export function DocumentUpload({
                 <Dog size={17} />
                 {draft.file ? "문서에서 읽은 강아지 정보" : "기록할 강아지"}
               </h3>
-              {(draft.file ||
-                !draft.targetPetId ||
-                draft.targetPetId === "new") && (
-                <>
-                  <div className="review-fields">
-                    <label>
-                      강아지 이름
-                      <Input
-                        value={draft.extraction.animal.name}
-                        onChange={(e) =>
-                          updateExtraction({
-                            animal: {
-                              ...draft.extraction.animal,
-                              name: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder="보호자 이름이 아닌 강아지 이름"
-                        maxLength={80}
-                      />
-                    </label>
-                    <label>
-                      품종
-                      <Input
-                        value={draft.extraction.animal.breed}
-                        onChange={(e) =>
-                          updateExtraction({
-                            animal: {
-                              ...draft.extraction.animal,
-                              breed: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder={
-                          draft.file
-                            ? "문서에 없으면 비워두세요"
-                            : "품종 · 선택"
-                        }
-                        maxLength={80}
-                      />
-                    </label>
-                  </div>
-                  <div className="review-fields">
-                    <label>
-                      성별
-                      <Input
-                        value={draft.extraction.animal.sex}
-                        onChange={(e) =>
-                          updateExtraction({
-                            animal: {
-                              ...draft.extraction.animal,
-                              sex: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder="수컷 / 암컷"
-                        maxLength={30}
-                      />
-                    </label>
-                    <label>
-                      문서상 나이
-                      <Input
-                        value={draft.extraction.animal.age}
-                        onChange={(e) =>
-                          updateExtraction({
-                            animal: {
-                              ...draft.extraction.animal,
-                              age: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder="예: 7세"
-                        maxLength={60}
-                      />
-                    </label>
-                  </div>
-                  <div className="review-fields">
-                    <label>
-                      체중
-                      <Input
-                        value={draft.extraction.animal.weight || ""}
-                        onChange={(e) =>
-                          updateExtraction({
-                            animal: {
-                              ...draft.extraction.animal,
-                              weight: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder={
-                          draft.file
-                            ? "예: 4.2 kg · 기재된 경우만"
-                            : "예: 4.2 kg · 선택"
-                        }
-                        maxLength={40}
-                      />
-                    </label>
-                  </div>
-                </>
-              )}
+              <>
+                <div className="review-fields">
+                  <label>
+                    강아지 이름
+                    <Input
+                      value={draft.extraction.animal.name}
+                      onChange={(e) =>
+                        updateExtraction({
+                          animal: {
+                            ...draft.extraction.animal,
+                            name: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="보호자 이름이 아닌 강아지 이름"
+                      maxLength={80}
+                    />
+                  </label>
+                  <label>
+                    품종
+                    <Input
+                      value={draft.extraction.animal.breed}
+                      onChange={(e) =>
+                        updateExtraction({
+                          animal: {
+                            ...draft.extraction.animal,
+                            breed: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder={
+                        draft.file ? "문서에 없으면 비워두세요" : "품종 · 선택"
+                      }
+                      maxLength={80}
+                    />
+                  </label>
+                </div>
+                <div className="review-fields">
+                  <label>
+                    성별
+                    <Input
+                      value={draft.extraction.animal.sex}
+                      onChange={(e) =>
+                        updateExtraction({
+                          animal: {
+                            ...draft.extraction.animal,
+                            sex: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="수컷 / 암컷"
+                      maxLength={30}
+                    />
+                  </label>
+                  <label>
+                    문서상 나이
+                    <Input
+                      value={draft.extraction.animal.age}
+                      onChange={(e) =>
+                        updateExtraction({
+                          animal: {
+                            ...draft.extraction.animal,
+                            age: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="예: 7세"
+                      maxLength={60}
+                    />
+                  </label>
+                </div>
+                <div className="review-fields">
+                  <label>
+                    체중
+                    <Input
+                      value={draft.extraction.animal.weight || ""}
+                      onChange={(e) =>
+                        updateExtraction({
+                          animal: {
+                            ...draft.extraction.animal,
+                            weight: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder={
+                        draft.file
+                          ? "예: 4.2 kg · 기재된 경우만"
+                          : "예: 4.2 kg · 선택"
+                      }
+                      maxLength={40}
+                    />
+                  </label>
+                </div>
+              </>
               {pets.filter((p) => !p.sample).length > 0 && (
                 <label className="field-label">
                   이 기록을 연결할 강아지

@@ -6,6 +6,9 @@
   max-width: 630px;
 }
 .dock-actions .primary-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   max-width: none;
   min-width: 0;
   padding-inline: 12px;

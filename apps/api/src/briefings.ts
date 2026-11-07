@@ -1,45 +1,17 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { logAiFailure } from "./ai-diagnostics";
-import { parseAiResponse } from "./ai-response";
-import { allowedChatOrigin } from "./chat-policy";
+import { logAiFailure } from "./ai-diagnostics.ts";
+import { parseAiResponse } from "./ai-response.ts";
+import { allowedChatOrigin } from "./chat-policy.ts";
 import {
   groundedFacts,
   supportedWatch,
   groundedPreparation,
-} from "./briefing-facts";
+  completeFollowUp,
+} from "./briefing-facts.ts";
+import { clinicalGuides } from "./clinical-guides.ts";
 
-const clinicalGuides = [
-  {
-    id: "aaha-senior",
-    title: "AAHA 노령 동물 관리 지침",
-    url: "https://www.aaha.org/resources/2023-aaha-senior-care-guidelines-for-dogs-and-cats/",
-    facts:
-      "Only supports general preparation for documented multiple coexisting conditions or explicitly documented senior status, never a specific disease progression or a single unrelated condition. Coexisting conditions and caregiver observations should be considered together. Care plans are individualized with a veterinarian. Age alone does not establish a disease. Home photos and behavior records support, but do not replace, clinical assessment.",
-  },
-  {
-    id: "iris-kidney",
-    title: "IRIS 신장질환 관리 지침",
-    url: "https://www.iris-kidney.com/iris-guidelines-1",
-    facts:
-      "For documented chronic kidney disease, monitoring and treatment depend on the individual patient and veterinary assessment. A diagnosis, stage, or progression cannot be inferred from a prescription or missed dose alone.",
-  },
-  {
-    id: "aaha-diabetes",
-    title: "AAHA 당뇨견 혈당 모니터링",
-    url: "https://www.aaha.org/resources/2026-aaha-diabetes-management-guidelines-for-dogs/section-9-glucose-monitoring/",
-    facts:
-      "For documented diabetes treated with insulin, glucose monitoring assesses response and can identify low blood glucose. Return of clinical signs or suspected hypoglycemia warrants veterinary assessment. Do not give insulin dose adjustment instructions.",
-  },
-  {
-    id: "merck-heart",
-    title: "Merck 반려견 심혈관 질환 관찰",
-    url: "https://www.merckvetmanual.com/dog-owners/heart-and-blood-vessel-disorders-of-dogs/diagnosis-of-cardiovascular-disease-in-dogs",
-    facts:
-      "In dogs with heart disease, changes in exercise tolerance, coughing, and breathing can be relevant to veterinary assessment. These observations are not specific enough to establish the cause or diagnosis. New breathing difficulty requires prompt veterinary contact.",
-  },
-];
 const evidence = z.array(z.string().max(100)).min(1).max(10);
 const outputSchema = z.object({
   watch: z
@@ -117,7 +89,7 @@ Records with source manual are caregiver-entered observations, not independently
 Use ALL supplied historical diagnoses, suspected/resolved statuses, prescription changes and actual administration records together, retaining important older history. The user's uploaded diagnosis is documented history, not independently verified clinical truth. Unchecked doses are unknown, not proof of omission or normal health. A temporary pause is not a veterinary discontinuation. A profile's age is as of profileAsOf, not necessarily the current age. Order clinical history by document dates, never upload times. Same-day records have no established clinical sequence. Do not assert improvement, deterioration, treatment success or absence of disease without supporting measurements.
 Return only JSON: {watch:[{title,possibility,prepare,sourceIds,referenceIds}], questions:[strings], unknowns:[strings]}.
 The server already builds current facts from the chart; do NOT generate a current-state summary. Each watch possibility must be a complete Korean sentence of at least 12 characters explaining WHY this specific documented history could require observation; never output the literal placeholder '가능성'. Each prepare must be a complete Korean sentence of at least 12 characters describing a concrete non-treatment preparation. Preparation must be observation, collecting existing records, or asking a veterinarian about an existing plan, NEVER ordering new tests or saying a new examination must be done. A past diagnosis is not proof it ended: do NOT invent recurrence/relapse (재발), recovery, or improvement. Cite exact sourceIds from records.id and guide IDs, not numbers or dates.
-Every watch item must cite sourceIds that exist in input records. Watch items are CONDITIONAL possibilities, not diagnosed conditions or predictions. Each must also be specifically supported by supplied clinical guide facts and cite the guide ID. A 'history' label never means improved/resolved; do not claim recovery unless the record explicitly says it. Do not introduce unrelated diseases. For example low glucose may be discussed only for documented insulin-treated diabetes. Never present a statistical probability, a guaranteed prognosis, or a diagnosis based only on breed/age. If evidence is insufficient, omit watch items and explain the missing facts under unknowns.
+Every watch item must cite sourceIds that exist in input records. Watch items are CONDITIONAL possibilities, not diagnosed conditions or predictions. Each must also be specifically supported by supplied clinical guide facts and cite the guide ID. A 'history' label never means improved/resolved; do not claim recovery unless the record explicitly says it. Do not introduce unrelated diseases. For example low glucose may be discussed only for documented insulin-treated diabetes. Never present a statistical probability, a guaranteed prognosis, or a diagnosis based only on breed/age. Cover documented conditions when a supplied guide supports a concrete observation or preparation topic, even if there are no medications. An old diagnosis does not prove current infection, recovery or relapse: describe the documented status and ask about subsequent progress. Do not leave questions empty just because progression is unknown: ask about documented conditions, existing results and the existing follow-up plan. If no guide supports a condition-specific watch item, omit that watch item, explain the missing facts under unknowns, and still ask a chart-grounded follow-up question.
 Preparation may suggest keeping observations, bringing records to the veterinarian, and confirming an existing follow-up plan. Do not give new treatment, diet, supplement, exercise, or medication adjustment instructions. Do not manufacture tests or daily observations. Clearly distinguish chart facts from future possibilities. Keep at most 3 watch items and 3 questions. Calm, short, specific Korean; no long disclaimer. Do not output Markdown.`;
 
 export const briefings = new Hono<{
@@ -189,15 +161,12 @@ briefings.post("/analyze", async (c) => {
     stage = "grounding";
     const ids = new Set(input.context.records.map((d) => d.id));
     const guideIds = new Set(clinicalGuides.map((g) => g.id));
-    if (
-      result.watch.some(
-        (i) =>
-          i.sourceIds.some((id) => !ids.has(id)) ||
-          i.referenceIds.some((id) => !guideIds.has(id)),
-      )
-    )
-      throw new Error("Unsupported reference");
     const watch = result.watch
+      .filter(
+        (item) =>
+          item.sourceIds.every((id) => ids.has(id)) &&
+          item.referenceIds.every((id) => guideIds.has(id)),
+      )
       .filter((item) => supportedWatch(item, input.context))
       .map((item) => ({ ...item, prepare: groundedPreparation(item) }));
     if (watch.length !== result.watch.length)
@@ -213,16 +182,18 @@ briefings.post("/analyze", async (c) => {
     result.unknowns = result.unknowns.filter(
       (q) => recurrenceRecorded || !/재발/.test(q),
     );
+    const followUp = completeFollowUp(input.context, { watch, questions });
     return c.json({
       ...result,
       ...groundedFacts(input.context),
-      watch,
-      questions,
+      ...followUp,
       unknowns: [...new Set(result.unknowns)].slice(0, 5),
       contextHash: input.contextHash,
       generatedAt: new Date().toISOString(),
       references: clinicalGuides
-        .filter((g) => watch.some((w) => w.referenceIds.includes(g.id)))
+        .filter((g) =>
+          followUp.watch.some((w) => w.referenceIds.includes(g.id)),
+        )
         .map(({ id, title, url }) => ({ id, title, url })),
     });
   } catch (error) {

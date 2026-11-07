@@ -57,6 +57,11 @@
   border-radius: 26px 26px 0 0;
 }
 
+.luvo-dialog-viewport > .dialog-content.upload-dialog[data-variant="sheet"] {
+  border-radius: 26px;
+  border-bottom: 1px solid #e0e7d7;
+}
+
 .luvo-dialog-viewport > .dialog-content[data-variant="sheet"][data-state="open"] {
   animation: luvo-sheet-enter 180ms ease-out;
 }

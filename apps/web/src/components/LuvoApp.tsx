@@ -88,6 +88,7 @@ export default function LuvoApp() {
   const [research, setResearch] = useState(researchTarget);
   const [date, setDate] = useState(localDate());
   const [upload, setUpload] = useState(false);
+  const [uploadPetId, setUploadPetId] = useState<string>();
   const [document, setDocument] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
@@ -237,6 +238,10 @@ export default function LuvoApp() {
       true,
     );
   }
+  function openRecord(petId?: string) {
+    setUploadPetId(petId);
+    setUpload(true);
+  }
   async function saveDocument(draft: Draft, doc: DocumentRecord) {
     let previous: Household | undefined;
     const ok = await persist(
@@ -328,7 +333,7 @@ export default function LuvoApp() {
   return (
     <div className="care-app">
       {!pet || view === "welcome" ? (
-        <DocumentOnboarding onUpload={() => setUpload(true)} />
+        <DocumentOnboarding onUpload={() => openRecord()} />
       ) : (
         <>
           <div className="desktop-masthead">
@@ -468,10 +473,7 @@ export default function LuvoApp() {
                     </button>
                   ))}
                 </div>
-                <button
-                  className="add-dog-card"
-                  onClick={() => setUpload(true)}
-                >
+                <button className="add-dog-card" onClick={() => openRecord()}>
                   <span>
                     <Plus size={24} />
                   </span>
@@ -526,7 +528,9 @@ export default function LuvoApp() {
               <div className="dock-actions">
                 <button
                   className="primary-action"
-                  onClick={() => setUpload(true)}
+                  onClick={() =>
+                    openRecord(view === "dogs" ? undefined : pet.id)
+                  }
                 >
                   <Plus size={21} />
                   <span>건강 기록 추가</span>
@@ -549,6 +553,7 @@ export default function LuvoApp() {
         open={upload}
         onOpenChange={setUpload}
         state={pet ?? empty}
+        initialPetId={uploadPetId}
         pets={pets}
         saving={saving}
         onSaved={saveDocument}
