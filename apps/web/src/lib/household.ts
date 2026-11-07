@@ -165,7 +165,7 @@ export function replacePet(
 export function briefingContext(pet: AppState, date = localDate()) {
   const documents = pet.documents.toSorted(compareDocuments);
   return {
-    analysisVersion: 6,
+    analysisVersion: 7,
     pet: {
       name: pet.profile.name,
       breed: pet.profile.breed || "",

@@ -165,6 +165,8 @@ test("a briefing context includes older conditions and only the selected dog rec
   assert.equal(context.pet.name, "두부");
   const hash = await contextHash(context);
   assert.equal(hash, await contextHash(briefingContext(first, "2026-11-07")));
+  // Saved briefings from before condition-specific follow-up must be refreshed.
+  assert.notEqual(hash, await contextHash({ ...context, analysisVersion: 6 }));
   assert.notEqual(
     hash,
     await contextHash(briefingContext(first, "2026-11-08")),

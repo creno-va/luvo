@@ -1,3 +1,5 @@
+import { clinicalGuides } from "./clinical-guides.ts";
+
 type Condition = {
   name: string;
   status: "diagnosed" | "suspected" | "resolved" | "history";
@@ -21,13 +23,101 @@ const statusLabel = {
   resolved: "호전·종료 기록",
   history: "과거 병력",
 } as const;
-export function groundedFacts(context: BriefContext) {
-  const records = [...context.records].sort(
+const dermatophytosisName = /^(피부\s*사상균증|dermatophytosis|ringworm)$/i;
+type WatchItem = {
+  title: string;
+  possibility: string;
+  prepare: string;
+  sourceIds: string[];
+  referenceIds: string[];
+};
+
+function orderedRecords(context: BriefContext) {
+  return [...context.records].sort(
     (a, b) =>
       (b.date + (b.time ? `T${b.time}` : "")).localeCompare(
         a.date + (a.time ? `T${a.time}` : ""),
       ) || a.id.localeCompare(b.id),
   );
+}
+
+function dermatophytosisRecord(context: BriefContext) {
+  for (const record of orderedRecords(context)) {
+    const condition = record.conditions.find((c) =>
+      dermatophytosisName.test(c.name.trim()),
+    );
+    if (condition) return { record, status: condition.status };
+    // Legacy records may have a diagnosis without structured conditions.
+    // Match only the diagnosis itself, not a mention in notes or a negation.
+    if (dermatophytosisName.test(record.diagnosis.trim()))
+      return { record, status: "diagnosed" as const };
+  }
+}
+
+export function completeFollowUp(
+  context: BriefContext,
+  generated: { watch: WatchItem[]; questions: string[] },
+) {
+  const skin = dermatophytosisRecord(context);
+  const questions = generated.questions.filter((q) => q.trim());
+  let watch = generated.watch;
+  if (skin) {
+    const { record, status } = skin;
+    const observation = {
+      diagnosed:
+        "피부사상균증 진단이 기록되어 있어요. 이후 경과는 기록 시점과 구분해 확인해야 하며, 탈모·각질·붉어짐 같은 피부 변화가 있다면 진료 경과를 살피는 단서가 될 수 있어요.",
+      suspected:
+        "피부사상균증 의심 소견이 기록되어 있어요. 현재 감염이 확진된 것으로 볼 수는 없으며, 탈모·각질·붉어짐 같은 피부 변화가 있다면 진료 때 함께 확인할 단서가 될 수 있어요.",
+      history:
+        "피부사상균증이 과거 병력으로 기록되어 있어요. 현재 감염 여부는 이 병력만으로 알 수 없으며, 이후 피부 변화가 있다면 이전 진료 기록과 함께 확인할 수 있어요.",
+      resolved:
+        "피부사상균증의 호전·종료 기록이 있어요. 이후 새로 피부 변화가 있다면 부위와 시점을 기록해 진료 때 확인할 수 있으며, 그 변화만으로 같은 감염이라고 단정할 수는 없어요.",
+    }[status];
+    // A verified guide-backed observation remains useful even when the model
+    // omits it. Replace duplicate skin items so stale statuses cannot win.
+    const skinWatch: WatchItem = {
+      title: "피부사상균증 기록 이후의 피부 상태",
+      possibility: `${record.date} 문서 기준으로, ${observation}`,
+      prepare:
+        "피부 변화가 있다면 부위·시작 시점과 사진을 남겨 주세요. 기존 진료·검사 기록을 함께 준비하고, 이후 경과와 기존 관리 계획을 주치의에게 확인해 주세요.",
+      sourceIds: [record.id],
+      referenceIds: ["merck-dermatophytosis"],
+    };
+    watch = [
+      skinWatch,
+      ...watch.filter((w) => !w.referenceIds.includes("merck-dermatophytosis")),
+    ];
+    questions.unshift(
+      `${record.date} 문서의 피부사상균증(${statusLabel[status]}) 이후 경과와 현재 피부 상태는 어떻게 확인하면 될까요?`,
+      "피부 상태와 기존 검사 결과를 함께 볼 때, 주치의가 정한 재진·관리 계획에서 확인할 점은 무엇인가요?",
+    );
+    if (status !== "resolved")
+      questions.push(
+        "현재 감염이 확인된다면, 함께 지내는 동물·사람과의 접촉 및 생활환경 관리에서 주의할 점은 무엇인가요?",
+      );
+  }
+  if (!questions.length) {
+    for (const record of orderedRecords(context)) {
+      for (const condition of record.conditions) {
+        questions.push(
+          `${record.date} 문서의 ${condition.name}(${statusLabel[condition.status]})에 대해 현재 경과와 기존 재진 계획에서 확인할 점은 무엇인가요?`,
+        );
+      }
+      if (!questions.length && record.diagnosis.trim())
+        questions.push(
+          `${record.date} 문서에 적힌 진료 내용의 이후 경과와 기존 재진 계획에서 확인할 점은 무엇인가요?`,
+        );
+      if (questions.length) break;
+    }
+  }
+  return {
+    watch: watch.slice(0, 3),
+    questions: [...new Set(questions)].slice(0, 3),
+  };
+}
+
+export function groundedFacts(context: BriefContext) {
+  const records = orderedRecords(context);
   const seen = new Set<string>();
   const conditions: {
     condition: Condition;
@@ -84,11 +174,21 @@ export function supportedWatch(
   const sources = context.records.filter((r) => item.sourceIds.includes(r.id));
   if (!sources.length || sources.length !== new Set(item.sourceIds).size)
     return false;
+  if (
+    !item.referenceIds.length ||
+    item.referenceIds.some((id) => !clinicalGuides.some((g) => g.id === id))
+  )
+    return false;
   const text = JSON.stringify(sources);
   const meds = JSON.stringify(context.currentMedications);
   if (/재발/.test((item.title || "") + item.possibility) && !/재발/.test(text))
     return false;
   for (const reference of item.referenceIds) {
+    if (
+      reference === "merck-dermatophytosis" &&
+      !dermatophytosisRecord({ ...context, records: sources })
+    )
+      return false;
     if (
       reference === "aaha-senior" &&
       new Set(sources.flatMap((r) => r.conditions.map((c) => c.name))).size <
@@ -141,5 +241,7 @@ export function groundedPreparation(item: {
     return "기침·호흡·활동에서 평소와 다른 점이 있으면 시작 시점을 기록해 진료 때 보여주세요. 새로 호흡이 힘들어지면 병원에 바로 연락해 주세요.";
   if (item.referenceIds.includes("aaha-diabetes"))
     return "현재 투약 기록을 준비하고, 혈당 관찰 계획은 주치의에게 확인해 주세요. 이 브리핑을 근거로 인슐린 용량을 임의로 바꾸지 마세요.";
+  if (item.referenceIds.includes("merck-dermatophytosis"))
+    return "피부 변화가 있다면 부위·시작 시점과 사진을 남기고, 기존 진료·검사 기록과 관리 계획을 주치의에게 확인해 주세요.";
   return "기존 질환과 모든 처방 목록을 함께 준비해 주세요. 새 검사나 관리 계획이 필요한지는 주치의와 확인해 주세요.";
 }
