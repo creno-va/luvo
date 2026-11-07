@@ -5,6 +5,7 @@ import {
   decodeDocumentResponse,
   documentDate,
   documentTime,
+  documentResponseSchema,
 } from "./document-extraction.ts";
 
 test("blank standard-form labels and unselected sex choices are never patient or drug values", () => {
@@ -35,7 +36,7 @@ test("blank standard-form labels and unselected sex choices are never patient or
   assert.equal(result.medications.length, 0);
   assert.equal(result.conditions.length, 0);
 });
-test("diagnosis fields preserve clinical date, onset, prognosis and notes separately from issuance", () => {
+test("diagnosis output preserves core fields and omits removed clinical details", () => {
   const result = normalize(
     {
       documentKind: "diagnosis",
@@ -60,10 +61,15 @@ test("diagnosis fields preserve clinical date, onset, prognosis and notes separa
   );
   assert.equal(result.documentKind, "diagnosis");
   assert.equal(result.date, "2026-11-07");
-  assert.equal(result.time, "09:30");
-  assert.equal(result.issuedDate, "2026-11-08");
-  assert.equal(result.onsetDate, "2026-11-01");
-  assert.equal(result.prognosis, "추적 관찰 예정");
+  for (const key of [
+    "time",
+    "clinic",
+    "issuedDate",
+    "onsetDate",
+    "prognosis",
+    "otherFindings",
+  ])
+    assert.ok(!Object.hasOwn(result, key));
   assert.equal(result.animal.breed, "말티즈");
   assert.equal(result.animal.weight, "4.2 kg");
   assert.equal(result.dateSource, "clinical");
@@ -94,6 +100,7 @@ test("ingredient, product, per-dose quantity, duration and sale quantity do not 
           productName: "가상제품 A",
           dose: "0.5정",
           durationDays: "7일",
+          durationEvidence: "처방일수 7일",
           totalQuantity: "14정",
           frequency: "1일 2회",
           instructions: "경구",
@@ -112,8 +119,6 @@ test("ingredient, product, per-dose quantity, duration and sale quantity do not 
   assert.equal(med.durationDays, "7일");
   assert.equal(med.frequency, "1일 2회");
   assert.deepEqual(med.times, []);
-  assert.equal(med.startDate, "");
-  assert.equal(med.endDate, "");
 });
 test("a species in the type cell is kept apart from a missing breed", () => {
   const result = normalize(
@@ -124,7 +129,6 @@ test("a species in the type cell is kept apart from a missing breed", () => {
     },
     "diagnosis",
   );
-  assert.equal(result.animal.species, "개");
   assert.equal(result.animal.breed, "");
   assert.deepEqual(result.medications, []);
 });
@@ -193,8 +197,6 @@ test("owner birth dates and unsupported stop/suspected classifications are not a
     },
     "prescription",
   );
-  assert.equal(result.animal.birthDate, "");
-  assert.equal(result.medications[0].action, "prescribe");
   assert.equal(result.conditions[0].status, "diagnosed");
   assert.equal(result.dateSource, "issued");
   const patient = normalize(
@@ -213,8 +215,8 @@ test("owner birth dates and unsupported stop/suspected classifications are not a
     },
     "diagnosis",
   );
-  assert.equal(patient.animal.birthDate, "2019-04-03");
-  assert.equal(patient.medications[0].action, "stop");
+  assert.equal(patient.medications.length, 0);
+  assert.ok(!Object.hasOwn(patient.animal, "birthDate"));
   assert.equal(patient.conditions[0].status, "suspected");
 });
 
@@ -234,6 +236,74 @@ test("duration fields reject code fragments or inferred date arithmetic", () => 
     "prescription",
   );
   assert.equal(result.medications[0].durationDays, "");
-  assert.equal(result.medications[0].action, "prescribe");
   assert.ok(result.warnings.some((w) => w.includes("처방일수")));
+});
+
+test("removed fields cannot be requested by the model schema or returned by normalization", () => {
+  const properties = documentResponseSchema.properties;
+  for (const key of [
+    "clinic",
+    "time",
+    "issuedDate",
+    "onsetDate",
+    "prognosis",
+    "otherFindings",
+  ])
+    assert.ok(!Object.hasOwn(properties, key));
+  const patient = properties.animal.properties;
+  for (const key of ["species", "birthDate", "birthDateEvidence"])
+    assert.ok(!Object.hasOwn(patient, key));
+  const medication = properties.medications.items.properties;
+  for (const key of [
+    "action",
+    "actionEvidence",
+    "startDate",
+    "endDate",
+    "instructions",
+  ])
+    assert.ok(!Object.hasOwn(medication, key));
+  const result = normalize(
+    {
+      animal: { name: "보리", species: "개", birthDate: "2020-01-01" },
+      clinic: "병원",
+      time: "09:00",
+      medications: [
+        {
+          name: "약",
+          dose: "1정",
+          times: ["오후 8시 00분"],
+          startDate: "2026-11-01",
+          endDate: "2026-11-02",
+          instructions: "식후",
+          action: "prescribe",
+        },
+      ],
+    },
+    "prescription",
+  );
+  assert.deepEqual(result.medications[0].times, ["20:00"]);
+  for (const key of ["action", "startDate", "endDate", "instructions"])
+    assert.ok(!Object.hasOwn(result.medications[0], key));
+});
+
+test("dates alone cannot create a course length and excluded-field requests are dropped", () => {
+  const result = normalize(
+    {
+      animal: { name: "두부" },
+      date: "2026-11-07",
+      medications: [
+        {
+          name: "약",
+          dose: "1정",
+          times: ["20:00"],
+          durationDays: "2",
+          durationEvidence: "2026-11-07 ~ 2026-11-09",
+        },
+      ],
+      warnings: ["복용 중단일을 확인해 주세요.", "생년월일을 확인해 주세요."],
+    },
+    "prescription",
+  );
+  assert.equal(result.medications[0].durationDays, "");
+  assert.ok(!result.warnings.some((w) => /중단일|생년월일/.test(w)));
 });

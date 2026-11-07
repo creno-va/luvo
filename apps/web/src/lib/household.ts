@@ -1,5 +1,8 @@
 import {
   emptyState,
+  animalFields,
+  documentFields,
+  prescriptionFields,
   applyPrescription,
   localDate,
   isPrescribed,
@@ -11,12 +14,12 @@ import {
 import { compareDocuments } from "./chronology.ts";
 
 export type Household = {
-  version: 2;
+  version: 3;
   activePetId: string | null;
   pets: AppState[];
 };
 export const emptyHousehold = (): Household => ({
-  version: 2,
+  version: 3,
   activePetId: null,
   pets: [],
 });
@@ -25,24 +28,36 @@ export function activePet(store: Household): AppState | undefined {
 }
 export function migrateStore(value: unknown): Household {
   if (!value) return emptyHousehold();
-  const stored = value as Household | AppState;
-  if (stored.version === 2 && Array.isArray(stored.pets))
-    return { ...stored, pets: stored.pets.map(restoreClinicalDates) };
+  const stored = value as {
+    version: number;
+    pets?: AppState[];
+    activePetId?: string | null;
+  } & Partial<Omit<AppState, "version">>;
+  if (
+    (stored.version === 2 || stored.version === 3) &&
+    Array.isArray(stored.pets)
+  )
+    return {
+      version: 3,
+      activePetId: stored.activePetId || null,
+      pets: stored.pets.map(restoreClinicalDates),
+    };
   if (stored.version === 1 && Array.isArray(stored.documents)) {
     if (
       !stored.documents.length &&
-      !stored.medications.length &&
-      stored.profile.name === "우리 아이"
+      !stored.medications?.length &&
+      stored.profile?.name === "우리 아이"
     )
       return emptyHousehold();
     const pet = {
       ...emptyState(),
       ...stored,
+      version: 1 as const,
       id: stored.id || crypto.randomUUID(),
       revision: stored.revision ?? 0,
-    };
+    } as AppState;
     return {
-      version: 2,
+      version: 3,
       activePetId: pet.id,
       pets: [restoreClinicalDates(pet)],
     };
@@ -52,19 +67,37 @@ export function migrateStore(value: unknown): Household {
   );
 }
 function restoreClinicalDates(pet: AppState): AppState {
+  const profile = animalFields({
+    name: pet.profile.name,
+    breed: pet.profile.breed || "",
+    sex: pet.profile.sex || "",
+    age: pet.profile.age || "",
+    weight: pet.profile.weight,
+  });
   return {
     ...pet,
+    profile: {
+      ...profile,
+      detail: pet.profile.detail,
+      asOf: pet.profile.asOf,
+      asOfTime: pet.profile.asOfTime,
+    },
+    documents: pet.documents.map(documentFields),
     medications: pet.medications.map((med) => ({
       ...med,
       revisions: med.revisions.map((revision) => {
-        const doc = pet.documents.find((d) => d.id === revision.documentId);
-        return doc
-          ? {
-              ...revision,
-              documentDate: doc.date,
-              documentTime: doc.time || "",
-            }
-          : revision;
+        const doc = pet.documents.find((d) => d.id === revision.documentId) as
+          (DocumentRecord & { time?: string }) | undefined;
+        return {
+          ...prescriptionFields(revision),
+          documentId: revision.documentId,
+          recordedAt: revision.recordedAt,
+          documentDate: doc?.date || revision.documentDate,
+          documentTime: revision.documentTime || doc?.time || "",
+          startDate: revision.startDate,
+          endDate: revision.endDate || "",
+          action: revision.action || "prescribe",
+        };
       }),
     })),
   };
@@ -86,7 +119,7 @@ export function resolvePatient(
   if (!matches.length) return { kind: "new" };
   const compatible = matches.filter(
     (p) =>
-      !(["breed", "sex", "birthDate"] as const).some(
+      !(["breed", "sex"] as const).some(
         (key) =>
           p.profile[key] &&
           animal[key] &&
@@ -129,7 +162,6 @@ export function ingestDocument(
               breed: "",
               sex: "",
               age: "",
-              birthDate: "",
             },
           );
   if (resolution.kind === "review") throw new Error(resolution.reason);
@@ -143,7 +175,7 @@ export function ingestDocument(
     );
   const pet = applyPrescription(existing ?? emptyState(), doc);
   return {
-    version: 2,
+    version: 3,
     activePetId: pet.id,
     pets: existing
       ? realPets.map((p) => (p.id === pet.id ? pet : p))
@@ -171,15 +203,12 @@ export function briefingContext(pet: AppState, date = localDate()) {
       breed: pet.profile.breed || "",
       sex: pet.profile.sex || "",
       age: pet.profile.age || "",
-      birthDate: pet.profile.birthDate || "",
       profileAsOf: pet.profile.asOf || "",
-      profileAsOfTime: pet.profile.asOfTime || "",
     },
     asOf: date,
     records: documents.map((d) => ({
       id: d.id,
       date: d.date,
-      time: d.time || "",
       diagnosis: d.diagnosis,
       summary: d.summary,
       conditions: d.conditions ?? [],
@@ -189,7 +218,7 @@ export function briefingContext(pet: AppState, date = localDate()) {
       .filter((m) => isPrescribed(m, date))
       .map((m) => ({
         id: m.id,
-        ...revisionAt(m, date),
+        ...prescriptionFields(revisionAt(m, date)!),
         name: m.name,
         paused: m.pauses.some((p) => !p.end),
         pauseHistory: m.pauses,

@@ -1,27 +1,23 @@
 import type { AppState, DocumentRecord } from "./domain.ts";
 
-// Clinic wall-clock time, never the upload timestamp. No time means date only.
-export const documentMoment = (doc: Pick<DocumentRecord, "date" | "time">) =>
+export const documentMoment = (doc: { date: string; time?: string }) =>
   doc.date + (doc.time ? `T${doc.time}` : "");
 export const compareDocuments = (
-  a: Pick<DocumentRecord, "id" | "date" | "time">,
-  b: Pick<DocumentRecord, "id" | "date" | "time">,
-) =>
-  documentMoment(b).localeCompare(documentMoment(a)) ||
-  a.id.localeCompare(b.id);
+  a: Pick<DocumentRecord, "id" | "date">,
+  b: Pick<DocumentRecord, "id" | "date">,
+) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id);
 export const documentDateLabel = (
-  doc: Pick<DocumentRecord, "date" | "time" | "dateSource">,
-) =>
-  `${doc.date}${doc.time ? ` ${doc.time}` : " · 시간 미기재"}${doc.dateSource === "issued" ? " · 발급일 기준" : ""}`;
+  doc: Pick<DocumentRecord, "date" | "dateSource">,
+) => `${doc.date}${doc.dateSource === "issued" ? " · 발급일 기준" : ""}`;
 
 export function timelineEntries(state: AppState) {
   const documents = state.documents.map((doc) => ({
     id: `document:${doc.id}`,
-    at: documentMoment(doc),
-    sortAt: documentMoment(doc),
-    dateOnly: !doc.time,
+    at: doc.date,
+    sortAt: doc.date,
+    dateOnly: true,
     type: "document" as const,
-    title: `${doc.clinic || "병원"} ${doc.kind === "diagnosis" ? "진단서" : doc.kind === "prescription" ? "처방전" : "진료 기록"}`,
+    title: `${doc.kind === "diagnosis" ? "진단서" : doc.kind === "prescription" ? "처방전" : "진료 기록"}`,
     detail: `${doc.items.length}개의 약 · 서류에 적힌 진료일 기준`,
     documentId: doc.id,
   }));
