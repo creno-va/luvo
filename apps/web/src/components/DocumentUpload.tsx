@@ -3,6 +3,7 @@ import {
   Camera,
   Check,
   CircleHelp,
+  ChevronDown,
   Dog,
   FilePlus2,
   FileText,
@@ -35,8 +36,9 @@ import {
   type PrescriptionItem,
 } from "@/lib/domain";
 import { fingerprint } from "@/lib/storage";
-import { analysisImage } from "@/lib/image";
+import { analysisViews } from "@/lib/image";
 import { resolvePatient } from "@/lib/household";
+import { preparePrescriptionReview } from "@/lib/prescription-review";
 export type Draft = {
   extraction: Extraction;
   file: File;
@@ -48,7 +50,7 @@ export type Draft = {
 const blankItem = (): PrescriptionItem => ({
   name: "",
   dose: "",
-  times: ["08:00", "20:00"],
+  times: [],
   startDate: "",
   endDate: "",
   instructions: "",
@@ -172,10 +174,17 @@ export function DocumentUpload({
         setStep("pick");
         return;
       }
-      const image = await analysisImage(file);
+      const views = await analysisViews(file);
       if (id !== operation.current) return;
       const form = new FormData();
-      form.append("image", image, "prescription.jpg");
+      for (const view of views) {
+        const field = view.region === "full" ? "image" : view.region;
+        form.append(
+          field,
+          view.blob,
+          `${view.region}.${view.blob.type === "image/png" ? "png" : "jpg"}`,
+        );
+      }
       form.append("documentKind", kind.current);
       request.current = new AbortController();
       const timeout = window.setTimeout(() => request.current?.abort(), 70_000);
@@ -193,12 +202,13 @@ export function DocumentUpload({
       if (id !== operation.current) return;
       if (!response.ok) throw new Error(data.error || "사진을 읽지 못했어요.");
       const extraction = data as Extraction;
+      extraction.medications = (extraction.medications || []).map(preparePrescriptionReview);
       const next: Draft = {
         extraction,
         file,
         fingerprint: hash,
         manual: false,
-        documentKind: kind.current,
+        documentKind: extraction.documentKind || kind.current,
       };
       if (!extraction.medications?.length) {
         next.extraction.medications = [];
@@ -214,20 +224,6 @@ export function DocumentUpload({
       );
       if (route.kind === "review") extraction.warnings.push(route.reason);
       setDraft(next);
-      if (
-        !extraction.warnings.length &&
-        !validateItems(extraction.medications) &&
-        isDate(extraction.date) &&
-        (!extraction.time || isTime(extraction.time))
-      ) {
-        const result = await onSaved(next, makeDocument(next));
-        if (id !== operation.current) return;
-        if (result.ok) {
-          setCompleted((n) => n + 1);
-          await nextFile();
-          return;
-        }
-      }
       setStep("review");
     } catch (cause) {
       if (id !== operation.current) return;
@@ -238,7 +234,8 @@ export function DocumentUpload({
           time: "",
           diagnosis: "",
           summary: "",
-          medications: [blankItem()],
+          medications: [],
+          quality: "unreadable",
           warnings: [],
           animal: { name: "", breed: "", sex: "", age: "", birthDate: "" },
           conditions: [],
@@ -265,12 +262,37 @@ export function DocumentUpload({
       date: value.extraction.date,
       time: value.extraction.time || "",
       diagnosis: value.extraction.diagnosis,
-      summary: value.manual ? "" : value.extraction.summary,
+      summary: [
+        value.manual ? "" : value.extraction.summary,
+        value.extraction.dateSource === "issued"
+          ? "서류 기준일은 발급일이며 실제 진료일은 미확인"
+          : "",
+        value.extraction.animal.weight
+          ? `문서상 체중: ${value.extraction.animal.weight}`
+          : "",
+        value.extraction.onsetDate
+          ? `발병일: ${value.extraction.onsetDate}`
+          : "",
+        value.extraction.prognosis
+          ? `예후 소견: ${value.extraction.prognosis}`
+          : "",
+        value.extraction.otherFindings
+          ? `그 밖의 사항: ${value.extraction.otherFindings}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+        .slice(0, 3000),
       items: value.extraction.medications,
       animal: value.extraction.animal,
-      conditions: value.extraction.conditions,
+      conditions: value.extraction.conditions.filter((c) => c.name.trim()),
       createdAt: new Date().toISOString(),
       kind: value.documentKind,
+      dateSource: value.extraction.dateSource,
+      issuedDate: value.extraction.issuedDate,
+      onsetDate: value.extraction.onsetDate,
+      prognosis: value.extraction.prognosis,
+      otherFindings: value.extraction.otherFindings,
     };
   }
   function updateExtraction(change: Partial<Extraction>) {
@@ -279,12 +301,10 @@ export function DocumentUpload({
     );
   }
   function updateItem(index: number, change: Partial<PrescriptionItem>) {
-    if (draft)
-      updateExtraction({
-        medications: draft.extraction.medications.map((item, i) =>
-          i === index ? { ...item, ...change } : item,
-        ),
-      });
+    setDraft((current) => current ? ({ ...current, extraction: { ...current.extraction, medications: current.extraction.medications.map((item,i)=>i===index ? preparePrescriptionReview({ ...item, ...change, ...(Object.hasOwn(change,"endDate") ? {endDateDerived:false} : {}) }) : item) } }) : current);
+  }
+  function updateMedicationTime(index:number, timeIndex:number, value:string) {
+    setDraft((current) => current ? ({ ...current, extraction: { ...current.extraction, medications: current.extraction.medications.map((item,i)=>i===index ? { ...item, times: item.times.map((time,j)=>j===timeIndex ? value : time) } : item) } }) : current);
   }
   async function save() {
     if (!draft) return;
@@ -323,6 +343,7 @@ export function DocumentUpload({
       }}
     >
       <DialogContent
+        variant="sheet"
         className={cn("upload-dialog", step === "review" && "review-dialog")}
       >
         <div className="modal-icon">
@@ -335,7 +356,7 @@ export function DocumentUpload({
               ? "진료 기록을 읽고 있어요"
               : draft?.manual
                 ? "사진을 보며 기록해 주세요"
-                : "이 내용만 확인해 주세요"}
+                : "읽은 내용을 확인해 주세요"}
         </DialogTitle>
         <DialogDescription className="modal-description">
           {step === "pick"
@@ -344,7 +365,7 @@ export function DocumentUpload({
               ? "문서에 적힌 내용을 차근차근 확인하고 있어요."
               : draft?.manual
                 ? "자동 분석을 완료하지 못했어요. 직접 입력한 내용으로 저장돼요."
-                : "분명하지 않은 내용은 확인하고, 기록에 반영할게요."}
+                : "사진에서 읽은 값을 채웠어요. 확인한 뒤 저장해 주세요."}
         </DialogDescription>
         {completed > 0 && (
           <p className="batch-progress" role="status">
@@ -464,7 +485,7 @@ export function DocumentUpload({
               <p>
                 문서에 없는 약이나 용량을 새로 결정하지 않아요.
                 <br />
-                읽기 어려운 내용만 다시 확인할게요.
+                읽은 값을 필드에 채운 뒤, 확인받고 저장해요.
               </p>
             </div>
           </>
@@ -489,6 +510,38 @@ export function DocumentUpload({
         )}
         {step === "review" && draft && (
           <>
+            <div
+              className={`ocr-result-banner quality-${draft.extraction.quality || "filled"}`}
+              role="status"
+            >
+              <FileText size={18} />
+              <div>
+                <strong>
+                  {draft.extraction.quality === "blank"
+                    ? "기입된 값이 없는 양식이에요"
+                    : draft.extraction.quality === "partial"
+                      ? "일부만 확인된 문서예요"
+                      : draft.manual
+                        ? "직접 확인할 수 있게 준비했어요"
+                        : "문서에서 읽은 값을 채웠어요"}
+                </strong>
+                <p>
+                  {draft.extraction.quality === "blank"
+                    ? "인쇄된 항목명은 값으로 채우지 않았어요. 기입된 서류를 다시 올리거나 직접 입력해 주세요."
+                    : "원본과 비교하고, 빈칸이나 잘못 읽은 항목을 수정해 주세요. 아직 저장되지 않았어요."}
+                </p>
+              </div>
+            </div>
+            {preview && (
+              <details className="ocr-compare">
+                <summary>
+                  사진 원본과 비교하기 <ImagePlus size={16} />
+                </summary>
+                <a href={preview} target="_blank" rel="noreferrer">
+                  <img src={preview} alt="인식한 진료 문서 원본" />
+                </a>
+              </details>
+            )}
             <div className="patient-review">
               <h3>
                 <Dog size={17} />
@@ -562,6 +615,41 @@ export function DocumentUpload({
                   />
                 </label>
               </div>
+              <div className="review-fields">
+                <label>
+                  동물 종류
+                  <Input
+                    value={draft.extraction.animal.species || ""}
+                    onChange={(e) =>
+                      updateExtraction({
+                        animal: {
+                          ...draft.extraction.animal,
+                          species: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="예: 개 · 품종과 구분해요"
+                    maxLength={40}
+                  />
+                </label>
+                <label>
+                  체중
+                  <Input
+                    value={draft.extraction.animal.weight || ""}
+                    onChange={(e) =>
+                      updateExtraction({
+                        animal: {
+                          ...draft.extraction.animal,
+                          weight: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="예: 4.2 kg · 기재된 경우만"
+                    maxLength={40}
+                  />
+                </label>
+              </div>
+              <label className="field-label">강아지 생년월일 · 문서에 기재된 경우만<Input type="date" value={draft.extraction.animal.birthDate} onChange={(e)=>updateExtraction({animal:{...draft.extraction.animal,birthDate:e.target.value}})}/></label>
               {pets.filter((p) => !p.sample).length > 0 && (
                 <label className="field-label">
                   이 기록을 연결할 강아지
@@ -633,7 +721,7 @@ export function DocumentUpload({
                 />
               </label>
               <label>
-                서류에 적힌 진료 날짜
+                서류 기준일 · 진단/처방일 또는 발급일
                 <Input
                   type="date"
                   value={draft.extraction.date}
@@ -651,8 +739,9 @@ export function DocumentUpload({
               </label>
             </div>
             <label className="field-label">
-              진단·진료 내용 <span>선택</span>
-              <Input
+              병명·진단 내용 <span>선택</span>
+              <textarea
+                className="ocr-textarea"
                 value={draft.extraction.diagnosis}
                 onChange={(e) =>
                   updateExtraction({ diagnosis: e.target.value })
@@ -660,6 +749,113 @@ export function DocumentUpload({
                 placeholder="문서에 적힌 내용을 남겨주세요"
               />
             </label>
+            <details
+              className="ocr-clinical-details"
+              open={draft.documentKind === "diagnosis" ? true : undefined}
+            >
+              <summary>
+                진단서 상세 항목 <Plus size={16} />
+              </summary>
+              <div className="review-fields">
+                <label>
+                  발병 연월일
+                  <Input
+                    type="date"
+                    value={draft.extraction.onsetDate || ""}
+                    onChange={(e) =>
+                      updateExtraction({ onsetDate: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  서류 발급일
+                  <Input
+                    type="date"
+                    value={draft.extraction.issuedDate || ""}
+                    onChange={(e) =>
+                      updateExtraction({ issuedDate: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <label className="field-label">
+                예후 소견
+                <textarea
+                  className="ocr-textarea"
+                  value={draft.extraction.prognosis || ""}
+                  onChange={(e) =>
+                    updateExtraction({ prognosis: e.target.value })
+                  }
+                  placeholder="진단서에 기재된 예후"
+                  maxLength={1000}
+                />
+              </label>
+              <label className="field-label">
+                그 밖의 사항
+                <textarea
+                  className="ocr-textarea"
+                  value={draft.extraction.otherFindings || ""}
+                  onChange={(e) =>
+                    updateExtraction({ otherFindings: e.target.value })
+                  }
+                  placeholder="문서에 적힌 기타 소견"
+                  maxLength={1500}
+                />
+              </label>
+            </details>
+            {draft.extraction.conditions.length > 0 && (
+              <div className="ocr-conditions">
+                <h3>기록할 병력</h3>
+                {draft.extraction.conditions.map((condition, index) => (
+                  <div className="ocr-condition" key={index}>
+                    <Input
+                      aria-label={`병력 ${index + 1} 이름`}
+                      value={condition.name}
+                      onChange={(e) =>
+                        updateExtraction({
+                          conditions: draft.extraction.conditions.map((c, i) =>
+                            i === index ? { ...c, name: e.target.value } : c,
+                          ),
+                        })
+                      }
+                    />
+                    <select
+                      aria-label={`병력 ${index + 1} 상태`}
+                      value={condition.status}
+                      onChange={(e) =>
+                        updateExtraction({
+                          conditions: draft.extraction.conditions.map((c, i) =>
+                            i === index
+                              ? {
+                                  ...c,
+                                  status: e.target.value as typeof c.status,
+                                }
+                              : c,
+                          ),
+                        })
+                      }
+                    >
+                      <option value="diagnosed">문서상 진단</option>
+                      <option value="suspected">의심 소견</option>
+                      <option value="history">과거 병력</option>
+                      <option value="resolved">호전·종료 기록</option>
+                    </select>
+                    <button
+                      aria-label={`병력 ${index + 1} 제거`}
+                      onClick={() =>
+                        updateExtraction({
+                          conditions: draft.extraction.conditions.filter(
+                            (_, i) => i !== index,
+                          ),
+                        })
+                      }
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             {draft.extraction.medications.map((item, i) => (
               <div className="review-medication" key={i}>
                 <div className="review-med-heading">
@@ -701,6 +897,46 @@ export function DocumentUpload({
                     />
                   </label>
                 </div>
+                <details
+                  className="ocr-med-details"
+                  open={
+                    !!(
+                      item.ingredient ||
+                      item.productName ||
+                      item.frequency ||
+                      item.durationDays ||
+                      item.totalQuantity
+                    )
+                  }
+                >
+                  <summary>
+                    처방전 원문 항목 <ChevronDown size={15} />
+                  </summary>
+                  <div className="review-fields">
+                    {(
+                      [
+                        ["ingredient", "성분명"],
+                        ["productName", "권장 제품명"],
+                        ["frequency", "용법·하루 횟수"],
+                        ["durationDays", "처방일수(투약일수)"],
+                        ["totalQuantity", "판매 수량(포장 단위)"],
+                      ] as const
+                    ).map(([field, label]) => (
+                      <label key={field}>
+                        {label}
+                        <Input
+                          value={item[field] || ""}
+                          onChange={(e) =>
+                            updateItem(i, { [field]: e.target.value })
+                          }
+                          placeholder="미기재"
+                          maxLength={100}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </details>
+                <label className="field-label">문서상 처방 상태<select className="patient-target" value={item.action} onChange={(e)=>updateItem(i,{action:e.target.value as "prescribe" | "stop"})}><option value="prescribe">처방 · 복용 일정 등록</option><option value="stop">문서에 중단 명시</option></select></label>
                 <div className="review-fields">
                   <label>
                     적용 시작일
@@ -713,7 +949,7 @@ export function DocumentUpload({
                     />
                   </label>
                   <label>
-                    종료일 <span>선택</span>
+                    종료일 <span>{item.endDateDerived ? "처방일수로 계산 · 확인 필요" : "선택"}</span>
                     <Input
                       type="date"
                       value={item.endDate}
@@ -723,7 +959,14 @@ export function DocumentUpload({
                     />
                   </label>
                 </div>
-                <label className="field-label">먹일 시간</label>
+                <label className="field-label">실제로 먹일 시간</label>
+                {!item.times.length && (
+                  <p className="ocr-time-note">
+                    {item.frequency ? `원문: ${item.frequency}. ` : ""}횟수만
+                    적힌 경우 시각은 비워두었어요. 실제 먹일 시간을 추가해
+                    주세요.
+                  </p>
+                )}
                 <div className="time-inputs">
                   {item.times.map((time, j) => (
                     <div key={j}>
@@ -731,13 +974,8 @@ export function DocumentUpload({
                         type="time"
                         value={time}
                         aria-label={`약 ${i + 1} 투약 시간 ${j + 1}`}
-                        onChange={(e) =>
-                          updateItem(i, {
-                            times: item.times.map((t, k) =>
-                              k === j ? e.target.value : t,
-                            ),
-                          })
-                        }
+                        onInput={(e)=>updateMedicationTime(i,j,e.currentTarget.value)}
+                        onChange={(e)=>updateMedicationTime(i,j,e.target.value)}
                       />
                       <button
                         onClick={() =>
@@ -755,7 +993,7 @@ export function DocumentUpload({
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      updateItem(i, { times: [...item.times, "12:00"] })
+                      updateItem(i, { times: [...item.times, ""] })
                     }
                   >
                     <Plus size={15} />
@@ -798,7 +1036,9 @@ export function DocumentUpload({
               ) : (
                 <Check size={18} />
               )}
-              확인하고 기록하기
+              {queue.current.length
+                ? "확인하고 다음 문서 보기"
+                : "확인하고 기록하기"}
             </Button>
           </>
         )}

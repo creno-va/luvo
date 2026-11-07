@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
+import { logAiFailure } from "./ai-diagnostics.ts";
+import { parseAiResponse } from "./ai-response.ts";
 import {
   groundedFacts,
   supportedWatch,
@@ -133,6 +135,7 @@ briefings.post("/analyze", async (c) => {
   } catch {
     return c.json({ error: "분석할 강아지의 기록을 확인해 주세요." }, 400);
   }
+  let stage: 'inference' | 'decode' | 'validation' | 'grounding' = 'inference';
   try {
     const response = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct",
@@ -157,11 +160,11 @@ briefings.post("/analyze", async (c) => {
         },
       },
     );
-    const raw = "response" in response ? response.response : undefined;
-    if (typeof raw !== "string") throw new Error("Missing output");
-    const json = raw.match(/\{[\s\S]*\}/)?.[0];
-    if (!json) throw new Error("Missing JSON");
-    const result = outputSchema.parse(JSON.parse(json));
+    stage = 'decode';
+    const parsed = parseAiResponse(response);
+    stage = 'validation';
+    const result = outputSchema.parse(parsed);
+    stage = 'grounding';
     const ids = new Set(input.context.records.map((d) => d.id));
     const guideIds = new Set(clinicalGuides.map((g) => g.id));
     if (
@@ -202,7 +205,8 @@ briefings.post("/analyze", async (c) => {
         )
         .map(({ id, title, url }) => ({ id, title, url })),
     });
-  } catch {
+  } catch (error) {
+    logAiFailure('briefing', stage, error);
     return c.json(
       {
         error:

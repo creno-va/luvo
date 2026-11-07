@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
+import "@/styles/landing-demo.css";
 export function DocumentOnboarding({
   onUpload,
   onSample,
@@ -27,6 +28,18 @@ export function DocumentOnboarding({
           먼저 둘러보기 <ArrowUpRight size={16} />
         </button>
       </header>
+      <aside className="landing-demo" aria-label="AI 시연 안내">
+        <span className="landing-demo-icon" aria-hidden="true">
+          <Sparkles size={20} />
+        </span>
+        <div>
+          <span className="landing-demo-label">CRENOVA · FIRST AI DEMO</span>
+          <p>
+            지우 대표님 검토를 위한 <strong>크레노바 첫 AI 시연</strong>
+          </p>
+        </div>
+        <span className="landing-demo-number" aria-hidden="true">01</span>
+      </aside>
       <section className="landing-hero">
         <div className="landing-copy">
           <span className="landing-tag">

@@ -1357,10 +1357,6 @@ img {
   padding: 12px 23px calc(24px + env(safe-area-inset-bottom));
   animation: sheet-up 0.22s ease-out;
 }
-.dialog-content.upload-dialog {
-  border-radius: 25px;
-  border-bottom: 1px solid #e0e7d7;
-}
 .dialog-content > button[aria-label="닫기"] {
   top: 18px;
   right: 18px;
@@ -2983,4 +2979,171 @@ img {
 }
 .upload-format + .upload-disclosure {
   margin-top: 14px;
+}
+.ocr-result-banner {
+  display: flex;
+  gap: 10px;
+  background: #ecf9e3;
+  border: 1px solid #d2e9bf;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 21px;
+  color: #5a7c43;
+}
+.ocr-result-banner > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ocr-result-banner strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+.ocr-result-banner p {
+  font-size: 11px;
+  line-height: 1.85;
+  margin-top: 6px;
+  color: #809470;
+}
+.ocr-result-banner.quality-blank,
+.ocr-result-banner.quality-partial,
+.ocr-result-banner.quality-unreadable {
+  background: #fbf5e8;
+  border-color: #e9dec2;
+  color: #8b784e;
+}
+.ocr-result-banner.quality-blank p,
+.ocr-result-banner.quality-partial p,
+.ocr-result-banner.quality-unreadable p {
+  color: #9d8d6d;
+}
+.ocr-compare {
+  margin-top: 13px;
+  border: 1px solid #e1ead7;
+  border-radius: 11px;
+  padding: 0 13px;
+}
+.ocr-compare summary,
+.ocr-clinical-details summary,
+.ocr-med-details summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #71875d;
+  padding: 13px 0;
+}
+.ocr-compare summary::-webkit-details-marker,
+.ocr-clinical-details summary::-webkit-details-marker,
+.ocr-med-details summary::-webkit-details-marker {
+  display: none;
+}
+.ocr-compare img {
+  width: 100%;
+  max-height: 48dvh;
+  object-fit: contain;
+  background: #f5f8ef;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+.ocr-clinical-details {
+  margin-top: 18px;
+  border-top: 1px solid #e4ebdc;
+  padding-bottom: 5px;
+}
+.ocr-clinical-details > .review-fields {
+  margin-top: 1px;
+}
+.ocr-textarea {
+  display: block;
+  width: 100%;
+  min-height: 85px;
+  resize: vertical;
+  border: 1px solid #dce7d0;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  padding: 11px 12px;
+  color: #50653f;
+  line-height: 1.8;
+  margin-top: 7px;
+  outline-color: #00c871;
+}
+.ocr-conditions {
+  border-top: 1px solid #e1ead7;
+  margin-top: 19px;
+  padding-top: 17px;
+}
+.ocr-conditions h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #71895b;
+  margin-bottom: 12px;
+}
+.ocr-condition {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+.ocr-condition > input {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+}
+.ocr-condition > select {
+  font-size: 11px;
+  border: 1px solid #dce7d0;
+  border-radius: 8px;
+  padding: 11px 5px;
+  background: white;
+  max-width: 108px;
+  color: #71885d;
+}
+.ocr-condition > button {
+  background: none;
+  display: flex;
+  color: #8ea47a;
+  padding: 5px;
+}
+.ocr-med-details {
+  background: #f6f9f1;
+  border-radius: 10px;
+  padding: 0 13px;
+  margin-top: 13px;
+}
+.ocr-med-details .review-fields {
+  margin-top: 0;
+  padding-bottom: 14px;
+}
+.ocr-time-note {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #9a845d;
+  background: #faf6e9;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 8px;
+}
+.document-detail-fields {
+  margin: 20px 0;
+  background: #f5f8ef;
+  padding: 15px;
+  border-radius: 11px;
+}
+.document-detail-fields > div + div {
+  margin-top: 13px;
+}
+.document-detail-fields dt {
+  font-size: 11px;
+  color: #91a87c;
+}
+.document-detail-fields dd {
+  font-size: 13px;
+  line-height: 1.85;
+  color: #627b4b;
+  margin: 5px 0 0;
+  white-space: pre-wrap;
 }
