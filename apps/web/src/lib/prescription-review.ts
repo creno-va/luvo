@@ -1,21 +1,18 @@
-import { isDate, shiftDate, type PrescriptionItem } from "./domain.ts";
-// Calendar duration is a review suggestion, never a dose calculation.
+// Calendar duration is derived scheduling metadata, never a dose calculation.
 export function durationEndDate(start: string, duration: string): string {
-  const match = duration.trim().match(/^(\d{1,4})\s*(?:일(?:분)?)?$/);
+  const match = duration.trim().match(/^([1-9]\d{0,3})\s*(?:일(?:분)?)?$/);
   const days = match ? Number(match[1]) : 0;
-  return isDate(start) && days >= 1 && days <= 3650
-    ? shiftDate(start, days - 1)
-    : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || days < 1 || days > 3650) return "";
+  const date = new Date(`${start}T12:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== start)
+    return "";
+  date.setUTCDate(date.getUTCDate() + days - 1);
+  return date.toISOString().slice(0, 10);
 }
-export function preparePrescriptionReview(
-  item: PrescriptionItem,
-): PrescriptionItem {
-  if (item.action === "stop" || (item.endDate && !item.endDateDerived))
-    return item;
-  const endDate = durationEndDate(item.startDate, item.durationDays || "");
-  return endDate
-    ? { ...item, endDate, endDateDerived: true }
-    : item.endDateDerived
-      ? { ...item, endDate: "", endDateDerived: false }
-      : item;
+// Numeric mobile keyboards do not expose ':', so insert it while typing.
+export function formatDoseTime(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  return digits.length > 2
+    ? `${digits.slice(0, 2)}:${digits.slice(2)}`
+    : digits;
 }

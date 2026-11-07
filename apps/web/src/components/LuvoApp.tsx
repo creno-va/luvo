@@ -255,7 +255,7 @@ export default function LuvoApp() {
       await persist((s) =>
         s.pets.length
           ? s
-          : { version: 2, activePetId: sample.id, pets: [sample] },
+          : { version: 3, activePetId: sample.id, pets: [sample] },
       )
     ) {
       navigate("home");
@@ -644,7 +644,7 @@ function Briefing({
         >
           <FileText size={12} />
           {d.date.slice(5).replace("-", ".")}
-          {d.time ? ` ${d.time}` : ""} 진료 기록 <ArrowUpRight size={12} />
+          {" "}진료 기록 <ArrowUpRight size={12} />
         </button>
       ));
   return (
@@ -894,10 +894,7 @@ function MedicationList({
                       <span>검색</span>
                     </button>
                   </div>
-                  <p>
-                    {plan.dose}
-                    {plan.instructions ? ` · ${plan.instructions}` : ""}
-                  </p>
+                  <p>{plan.dose}</p>
                 </div>
                 <Switch
                   checked={!paused}
@@ -1000,7 +997,7 @@ function Timeline({
               <div>
                 <time>
                   {event.type === "document"
-                    ? `${event.at.replace("T", " · ")}${event.dateOnly ? " · 시간 미기재" : ""}`
+                    ? event.at
                     : clock(event.at)}
                 </time>
                 {doc ? (
@@ -1252,7 +1249,9 @@ function DocumentSheet({
       <DialogContent variant="sheet" className="bottom-sheet document-sheet">
         <div className="sheet-handle" />
         <DialogTitle className="sheet-title">
-          {doc?.clinic || "진료 기록"}
+          {doc?.kind === "diagnosis"
+            ? "진단서"
+            : doc?.kind === "prescription" ? "처방전" : "진료 기록"}
         </DialogTitle>
         <DialogDescription className="sheet-description">
           {doc ? documentDateLabel(doc) : ""}
@@ -1283,12 +1282,9 @@ function DocumentSheet({
                 ))}
               </div>
             ) : null}
-            {(doc.onsetDate || doc.prognosis || doc.otherFindings || doc.animal?.weight) && <dl className="document-detail-fields">
-              {doc.animal?.weight && <div><dt>문서상 체중</dt><dd>{doc.animal.weight}</dd></div>}
-              {doc.onsetDate && <div><dt>발병 연월일</dt><dd>{doc.onsetDate}</dd></div>}
-              {doc.prognosis && <div><dt>예후 소견</dt><dd>{doc.prognosis}</dd></div>}
-              {doc.otherFindings && <div><dt>그 밖의 사항</dt><dd>{doc.otherFindings}</dd></div>}
-            </dl>}
+            {doc.animal?.weight && (
+              <p className="document-uploaded">문서상 체중 {doc.animal.weight}</p>
+            )}
             <div className="document-prescriptions">
               {doc.items.map((item, i) => (
                 <div key={i}>
@@ -1296,14 +1292,26 @@ function DocumentSheet({
                   <div>
                     <strong>{item.name}</strong>
                     <p>
-                      {item.action === "stop"
-                        ? "문서상 중단"
-                        : `${item.dose} · ${item.times.join(" / ")}`}
+                      {item.dose} · {item.times.join(" / ")}
                     </p>
-                    {(item.frequency || item.durationDays || item.totalQuantity) && <small>원문 { [item.frequency, item.durationDays ? `처방일수 ${item.durationDays}` : "", item.totalQuantity ? `판매 수량 ${item.totalQuantity}` : ""].filter(Boolean).join(" · ") }</small>}
-                    <small>
-                      {item.startDate} — {item.endDate || "종료일 미기재"}
-                    </small>
+                    {(item.frequency ||
+                      item.durationDays ||
+                      item.totalQuantity) && (
+                      <small>
+                        원문{" "}
+                        {[
+                          item.frequency,
+                          item.durationDays
+                            ? `처방일수 ${item.durationDays}`
+                            : "",
+                          item.totalQuantity
+                            ? `판매 수량 ${item.totalQuantity}`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </small>
+                    )}
                   </div>
                 </div>
               ))}

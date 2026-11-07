@@ -1,29 +1,31 @@
 import { documentMoment } from "./chronology.ts";
+import { durationEndDate } from "./prescription-review.ts";
 
 export type PrescriptionItem = {
   ingredient?: string;
   productName?: string;
   frequency?: string;
   durationDays?: string;
-  endDateDerived?: boolean;
   totalQuantity?: string;
   name: string;
   dose: string;
   times: string[];
+};
+// Scheduling metadata is derived from confirmed document data. Legacy dates
+// and explicit stops remain here to preserve existing dose history.
+export type MedicationRevision = PrescriptionItem & {
+  documentId: string;
+  recordedAt: string;
+  documentDate?: string;
+  documentTime?: string;
   startDate: string;
   endDate: string;
-  instructions: string;
   action: "prescribe" | "stop";
 };
 export type Medication = {
   id: string;
   name: string;
-  revisions: (PrescriptionItem & {
-    documentId: string;
-    recordedAt: string;
-    documentDate?: string;
-    documentTime?: string;
-  })[];
+  revisions: MedicationRevision[];
   pauses: { id: string; start: string; end: string | null }[];
 };
 export type DocumentRecord = {
@@ -32,13 +34,7 @@ export type DocumentRecord = {
   filename: string;
   kind?: "prescription" | "diagnosis";
   dateSource?: "clinical" | "issued" | "unknown";
-  issuedDate?: string;
-  onsetDate?: string;
-  prognosis?: string;
-  otherFindings?: string;
   date: string;
-  time?: string;
-  clinic: string;
   diagnosis: string;
   summary: string;
   createdAt: string;
@@ -48,13 +44,11 @@ export type DocumentRecord = {
   conditions?: ConditionEntry[];
 };
 export type AnimalInfo = {
-  species?: string;
   weight?: string;
   name: string;
   breed: string;
   sex: string;
   age: string;
-  birthDate: string;
 };
 export type ConditionEntry = {
   name: string;
@@ -92,12 +86,10 @@ export type AppState = {
   profile: {
     name: string;
     detail: string;
-    species?: string;
     weight?: string;
     breed?: string;
     sex?: string;
     age?: string;
-    birthDate?: string;
     asOf?: string;
     asOfTime?: string;
   };
@@ -124,13 +116,7 @@ export type Extraction = {
   documentKind?: "prescription" | "diagnosis";
   quality?: "filled" | "blank" | "partial" | "unreadable";
   dateSource?: "clinical" | "issued" | "unknown";
-  issuedDate?: string;
-  onsetDate?: string;
-  prognosis?: string;
-  otherFindings?: string;
-  clinic: string;
   date: string;
-  time?: string;
   diagnosis: string;
   summary: string;
   medications: PrescriptionItem[];
@@ -315,17 +301,14 @@ export function validateItems(items: PrescriptionItem[]): string | null {
     return "같은 이름의 약이 여러 번 있어요. 하나로 합치거나 이름을 구분해 주세요.";
   for (const item of items) {
     if (!item.name.trim()) return "약 이름을 확인해 주세요.";
-    if (!isDate(item.startDate)) return "적용 날짜를 확인해 주세요.";
+    if (item.durationDays && !durationEndDate("2026-01-01", item.durationDays))
+      return "처방일수는 1~3650일로 확인해 주세요.";
     if (
-      item.endDate &&
-      (!isDate(item.endDate) || item.endDate < item.startDate)
-    )
-      return "종료일은 시작일 이후로 정해 주세요.";
-    if (
-      item.action !== "stop" &&
-      (!item.dose.trim() ||
-        !item.times.length ||
-        item.times.some((t) => !isTime(t)))
+      !item.dose.trim() ||
+      !item.times.length ||
+      item.times.length > 8 ||
+      item.times.some((t) => !isTime(t)) ||
+      new Set(item.times).size !== item.times.length
     )
       return "용량과 투약 시간을 확인해 주세요.";
   }
@@ -335,16 +318,15 @@ const normalizedName = (name: string) =>
   name.normalize("NFKC").replace(/\s/g, "").toLocaleLowerCase();
 export function applyPrescription(
   state: AppState,
-  doc: DocumentRecord,
+  source: DocumentRecord,
 ): AppState {
+  const doc = documentFields(source);
   if (state.documents.some((d) => d.fingerprint === doc.fingerprint))
     throw new Error("이미 등록한 문서예요. 진료 기록에서 확인할 수 있어요.");
   const error = validateItems(doc.items);
   if (error) throw new Error(error);
   if (!isDate(doc.date))
     throw new Error("서류에 적힌 진료 날짜를 확인해 주세요.");
-  if (doc.time && !isTime(doc.time))
-    throw new Error("서류에 적힌 진료 시간을 확인해 주세요.");
   if (!doc.items.length && !doc.diagnosis.trim() && !doc.animal?.name)
     throw new Error("약이 없는 진단서는 진료 내용을 입력해 주세요.");
   const medications = structuredClone(state.medications);
@@ -359,7 +341,9 @@ export function applyPrescription(
       documentId: doc.id,
       recordedAt: doc.createdAt,
       documentDate: doc.date,
-      documentTime: doc.time || "",
+      startDate: doc.date,
+      endDate: durationEndDate(doc.date, item.durationDays || ""),
+      action: "prescribe" as const,
     };
     if (existing) existing.revisions.push(revision);
     else
@@ -387,7 +371,7 @@ export function applyPrescription(
               Object.entries(doc.animal).filter(([, value]) => value.trim()),
             ),
             asOf: doc.date,
-            asOfTime: doc.time || "",
+            asOfTime: "",
             detail: profileDetail({
               ...state.profile,
               ...Object.fromEntries(
@@ -403,7 +387,7 @@ export function applyPrescription(
         id: uid(),
         at: documentMoment(doc),
         type: "document",
-        title: `${doc.clinic || "병원"} 진료 기록을 추가했어요`,
+        title: "진료 기록을 추가했어요",
         detail: `${doc.items.length}개의 약 · ${doc.date}`,
         documentId: doc.id,
       },
@@ -426,26 +410,19 @@ export function sampleState(now = new Date()): AppState {
       name: "관절 관리 처방약",
       dose: "1회 1정",
       times: ["08:00", "20:00"],
-      startDate: shiftDate(date, -3),
-      endDate: shiftDate(date, 10),
-      instructions: "식후에 먹여 주세요",
-      action: "prescribe",
+      durationDays: "14",
     },
     {
       name: "피부 관리 처방약",
       dose: "1회 반 정",
       times: ["08:00"],
-      startDate: shiftDate(date, -3),
-      endDate: shiftDate(date, 3),
-      instructions: "처방된 용량을 지켜 주세요",
-      action: "prescribe",
+      durationDays: "7",
     },
   ];
   const result = applyPrescription(state, {
     id: uid(),
     fingerprint: "luvo-sample-v1",
     filename: "샘플 처방전",
-    clinic: "루보 동물병원",
     date: shiftDate(date, -3),
     diagnosis: "사용 흐름을 살펴보기 위한 가상의 기록이에요.",
     summary: "기존 처방이 오늘 투약 일정으로 연결돼요.",
@@ -456,4 +433,45 @@ export function sampleState(now = new Date()): AppState {
   result.profile = { name: "두부", detail: "말티푸 · 5살" };
   result.sample = true;
   return result;
+}
+
+// Explicit whitelists keep removed OCR fields out of newly stored records,
+// including older API responses that reach an already open client.
+export function animalFields(animal: AnimalInfo): AnimalInfo {
+  return {
+    name: animal.name,
+    breed: animal.breed,
+    sex: animal.sex,
+    age: animal.age,
+    ...(animal.weight ? { weight: animal.weight } : {}),
+  };
+}
+export function prescriptionFields(item: PrescriptionItem): PrescriptionItem {
+  return {
+    name: item.name,
+    dose: item.dose,
+    times: [...item.times],
+    ingredient: item.ingredient,
+    productName: item.productName,
+    frequency: item.frequency,
+    durationDays: item.durationDays,
+    totalQuantity: item.totalQuantity,
+  };
+}
+export function documentFields(doc: DocumentRecord): DocumentRecord {
+  return {
+    id: doc.id,
+    fingerprint: doc.fingerprint,
+    filename: doc.filename,
+    kind: doc.kind,
+    dateSource: doc.dateSource,
+    date: doc.date,
+    diagnosis: doc.diagnosis,
+    summary: doc.summary,
+    createdAt: doc.createdAt,
+    items: doc.items.map(prescriptionFields),
+    sample: doc.sample,
+    animal: doc.animal ? animalFields(doc.animal) : undefined,
+    conditions: doc.conditions,
+  };
 }

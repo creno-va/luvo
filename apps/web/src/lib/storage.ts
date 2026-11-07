@@ -14,7 +14,7 @@ export async function readState(): Promise<Household> {
   const transaction = (await db()).transaction("state", "readwrite");
   const stored = await transaction.store.get("current");
   const migrated = migrateStore(stored);
-  if (!stored || stored.version !== 2)
+  if (!stored || stored.version !== 3)
     await transaction.store.put(migrated, "current");
   await transaction.done;
   return migrated;

@@ -8,7 +8,6 @@ export type BriefContext = {
   records: {
     id: string;
     date: string;
-    time?: string;
     diagnosis: string;
     conditions: Condition[];
   }[];
@@ -23,10 +22,7 @@ const statusLabel = {
 } as const;
 export function groundedFacts(context: BriefContext) {
   const records = [...context.records].sort(
-    (a, b) =>
-      (b.date + (b.time ? `T${b.time}` : "")).localeCompare(
-        a.date + (a.time ? `T${a.time}` : ""),
-      ) || a.id.localeCompare(b.id),
+    (a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id),
   );
   const seen = new Set<string>();
   const conditions: {
@@ -45,7 +41,7 @@ export function groundedFacts(context: BriefContext) {
       }
     }
   const current = conditions.slice(0, 4).map(({ condition, record }) => ({
-    text: `${condition.name}: ${statusLabel[condition.status]} (${record.date}${record.time ? ` ${record.time}` : " · 시간 미기재"} 문서).${condition.note ? ` ${condition.note}` : ""}`,
+    text: `${condition.name}: ${statusLabel[condition.status]} (${record.date} 문서).${condition.note ? ` ${condition.note}` : ""}`,
     sourceIds: [record.id],
   }));
   if (!current.length && records[0]?.diagnosis)

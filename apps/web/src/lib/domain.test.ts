@@ -1,10 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { healthPeriods } from "./periods.ts";
-import {
-  durationEndDate,
-  preparePrescriptionReview,
-} from "./prescription-review.ts";
+import { durationEndDate, formatDoseTime } from "./prescription-review.ts";
 import {
   timelineEntries,
   compareDocuments,
@@ -36,7 +33,6 @@ function document(
     fingerprint,
     filename: "test.png",
     date: startDate,
-    clinic: "테스트 병원",
     diagnosis: "",
     summary: "",
     createdAt: "2026-11-07T00:00:00Z",
@@ -45,10 +41,7 @@ function document(
         name: "약 A",
         dose,
         times: ["08:00", "20:00"],
-        startDate,
-        endDate: "2026-11-14",
-        instructions: "",
-        action: "prescribe",
+        durationDays: "8일",
       },
     ],
   };
@@ -61,7 +54,7 @@ test("an earlier prescription uploaded later does not replace the current prescr
   assert.equal(revisionAt(s.medications[0], "2026-11-03")?.dose, "1정");
 });
 
-test("same-day clinical times determine document, prescription and timeline order despite reverse uploads", () => {
+test("new documents exclude clinical times and same-day order never uses upload timestamps", () => {
   const morning = {
     ...document("morning", date, "1정"),
     time: "09:30",
@@ -74,14 +67,13 @@ test("same-day clinical times determine document, prescription and timeline orde
   };
   let s = applyPrescription(emptyState(), evening);
   s = applyPrescription(s, morning);
-  assert.equal(revisionAt(s.medications[0], date)?.dose, "2정");
-  assert.deepEqual(
-    s.documents.toSorted(compareDocuments).map((d) => d.id),
-    ["evening", "morning"],
-  );
+  assert.ok(s.documents.every((d) => !Object.hasOwn(d, "time")));
   assert.deepEqual(
     timelineEntries(s).map((e) => e.at),
-    [`${date}T18:00`, `${date}T09:30`],
+    [date, date],
+  );
+  assert.ok(
+    s.documents.toSorted(compareDocuments).every((d) => d.date === date),
   );
   assert.equal(s.documents[0].createdAt, morning.createdAt);
 });
@@ -96,12 +88,12 @@ test("date-only records never become upload time or an invented midnight and leg
   const entry = timelineEntries(s)[0];
   assert.equal(entry.at, "2024-03-02");
   assert.equal(entry.dateOnly, true);
-  assert.match(documentDateLabel(old), /시간 미기재/);
+  assert.equal(documentDateLabel(old), "2024-03-02");
   assert.equal(timelineEntries({ ...s, activities: [] }).length, 1);
 });
 
 test("manual pause and actual dose-check times remain actual action timestamps", () => {
-  let s = applyPrescription(emptyState(), { ...document(), time: "07:00" });
+  let s = applyPrescription(emptyState(), document());
   const id = s.medications[0].id;
   s = toggleCheck(s, doseKey(id, date, "08:00"), localISO("08:03"));
   s = toggleMedication(s, id, localISO("09:00"));
@@ -114,16 +106,23 @@ test("manual pause and actual dose-check times remain actual action timestamps",
   assert.equal(entries[1].at, localISO("08:03"));
 });
 
-test("invalid document date or time is rejected instead of using upload time", () => {
+test("invalid document dates are rejected while removed fields are never stored", () => {
   assert.throws(
     () => applyPrescription(emptyState(), { ...document(), date: "" }),
     /진료 날짜/,
   );
-  assert.throws(
-    () => applyPrescription(emptyState(), { ...document(), time: "25:00" }),
-    /진료 시간/,
-  );
+  const source = {
+    ...document(),
+    clinic: "삭제 대상",
+    time: "25:00",
+    onsetDate: "2026-01-01",
+    prognosis: "삭제 대상",
+  };
+  const state = applyPrescription(emptyState(), source);
+  for (const key of ["clinic", "time", "onsetDate", "prognosis"])
+    assert.ok(!Object.hasOwn(state.documents[0], key));
 });
+
 test("pause and resume record an interval and preserve the prescription", () => {
   let s = applyPrescription(emptyState(), document());
   const id = s.medications[0].id;
@@ -183,14 +182,14 @@ test("pause does not discard completed doses or rewrite historical checks", () =
   assert.equal(items[0].paused, false);
   assert.equal(items[1].paused, true);
 });
-test("invalid dates and missing times need review instead of automatic application", () => {
+test("missing, invalid and duplicate 24-hour times require review", () => {
   const d = document();
-  d.items[0].startDate = "2026-02-30";
-  assert.match(validateItems(d.items)!, /날짜/);
-  d.items[0].startDate = date;
-  d.items[0].times = [];
-  assert.match(validateItems(d.items)!, /시간/);
+  for (const times of [[], ["25:00"], ["오후 8:00"], ["08:00", "08:00"]]) {
+    d.items[0].times = times;
+    assert.match(validateItems(d.items)!, /시간/);
+  }
 });
+
 test("a diagnosis document can be recorded without creating a medication", () => {
   const doc = document();
   doc.items = [];
@@ -270,20 +269,17 @@ test("only an explicit course length and confirmed start date suggest a review e
   for (const duration of ["1일 2회", "14정", "0일", "유효기간 3일"])
     assert.equal(durationEndDate("2026-11-07", duration), "");
   assert.equal(durationEndDate("", "7일"), "");
-  const item = { ...document().items[0], durationDays: "7일", endDate: "" };
-  const draft = preparePrescriptionReview(item);
-  assert.equal(draft.endDate, "2026-11-13");
-  assert.equal(draft.endDateDerived, true);
-  assert.equal(
-    preparePrescriptionReview({ ...draft, startDate: "2026-11-08" }).endDate,
-    "2026-11-14",
-  );
-  assert.equal(
-    preparePrescriptionReview({
-      ...draft,
-      endDate: "2026-11-20",
-      endDateDerived: false,
-    }).endDate,
-    "2026-11-20",
-  );
+  const d = document();
+  d.items[0].durationDays = "7일";
+  const state = applyPrescription(emptyState(), d);
+  assert.equal(state.medications[0].revisions[0].startDate, d.date);
+  assert.equal(state.medications[0].revisions[0].endDate, "2026-11-13");
+  assert.ok(!Object.hasOwn(state.documents[0].items[0], "startDate"));
+  assert.ok(!Object.hasOwn(state.documents[0].items[0], "endDate"));
+});
+
+test("24-hour text inputs insert a colon for numeric mobile keyboards", () => {
+  assert.equal(formatDoseTime("2000"), "20:00");
+  assert.equal(formatDoseTime("08:30"), "08:30");
+  assert.equal(formatDoseTime("2"), "2");
 });

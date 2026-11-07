@@ -26,7 +26,6 @@ const patient = (name = "두부"): AnimalInfo => ({
   breed: "말티즈",
   sex: "암컷",
   age: "7세",
-  birthDate: "",
 });
 function doc(id = "first", name = "두부", date = "2026-11-07"): DocumentRecord {
   return {
@@ -34,7 +33,6 @@ function doc(id = "first", name = "두부", date = "2026-11-07"): DocumentRecord
     fingerprint: id,
     filename: `${id}.png`,
     date,
-    clinic: "가상병원",
     diagnosis: "문서상 만성 병력",
     summary: "가상 기록",
     createdAt: `${date}T08:00:00Z`,
@@ -47,10 +45,7 @@ function doc(id = "first", name = "두부", date = "2026-11-07"): DocumentRecord
         name: "가상약 A",
         dose: "1정",
         times: ["08:00", "20:00"],
-        startDate: date,
-        endDate: "2026-12-01",
-        instructions: "",
-        action: "prescribe",
+        durationDays: "25일",
       },
     ],
   };
@@ -121,40 +116,68 @@ test("late historical documents do not regress age or other newer profile inform
   assert.equal(activePet(b)?.documents.length, 2);
 });
 
-test("same-day dog metadata and briefing records follow document time rather than upload time", () => {
-  const later = { ...doc("later"), time: "18:00" };
-  later.animal!.age = "7세";
-  const earlier = {
-    ...doc("earlier"),
-    time: "09:00",
-    createdAt: "2026-11-20T00:00:00Z",
-    animal: { ...patient(), age: "6세" },
+test("v2 migration removes document fields while preserving schedules, stops, pauses and checks", () => {
+  const pet = activePet(ingestDocument(emptyHousehold(), doc()))!;
+  const before = structuredClone(pet);
+  const oldDoc = {
+    ...pet.documents[0],
+    clinic: "구 병원",
+    time: "18:00",
+    onsetDate: "2026-01-01",
+    prognosis: "예후",
+    issuedDate: "2026-11-08",
+    animal: { ...patient(), species: "개", birthDate: "2019-01-01" },
+    items: pet.documents[0].items.map((item) => ({
+      ...item,
+      startDate: "2026-11-09",
+      endDate: "2026-12-01",
+      instructions: "식후",
+      action: "stop",
+    })),
   };
-  const pet = activePet(
-    ingestDocument(ingestDocument(emptyHousehold(), later), earlier),
-  )!;
-  assert.equal(pet.profile.age, "7세");
-  const context = briefingContext(pet);
-  assert.deepEqual(
-    context.records.map((r) => r.time),
-    ["18:00", "09:00"],
-  );
-  assert.ok(!JSON.stringify(context.records).includes("2026-11-20"));
-  const legacy = structuredClone(pet);
-  for (const revision of legacy.medications[0].revisions) {
-    delete revision.documentDate;
-    delete revision.documentTime;
-  }
+  const legacy = {
+    ...pet,
+    documents: [oldDoc],
+    profile: { ...pet.profile, species: "개", birthDate: "2019-01-01" },
+  };
+  legacy.medications[0].revisions[0].startDate = "2026-11-09";
+  legacy.medications[0].revisions[0].endDate = "2026-12-01";
+  legacy.medications[0].revisions[0].action = "stop";
+  legacy.medications[0].pauses.push({
+    id: "pause",
+    start: "2026-11-08T00:00:00Z",
+    end: null,
+  });
+  legacy.checks["legacy-dose"] = "2026-11-07T08:00:00Z";
   const migrated = migrateStore({
     version: 2,
-    activePetId: legacy.id,
+    activePetId: pet.id,
     pets: [legacy],
   });
-  assert.equal(
-    migrated.pets[0].medications[0].revisions[0].documentTime,
-    "18:00",
-  );
+  const next = migrated.pets[0];
+  assert.equal(migrated.version, 3);
+  assert.equal(next.id, before.id);
+  assert.equal(next.checks["legacy-dose"], legacy.checks["legacy-dose"]);
+  assert.deepEqual(next.medications[0].pauses, legacy.medications[0].pauses);
+  assert.equal(next.medications[0].revisions[0].startDate, "2026-11-09");
+  assert.equal(next.medications[0].revisions[0].endDate, "2026-12-01");
+  assert.equal(next.medications[0].revisions[0].action, "stop");
+  assert.equal(next.medications[0].revisions[0].documentTime, "18:00");
+  for (const key of ["clinic", "time", "onsetDate", "prognosis", "issuedDate"])
+    assert.ok(!Object.hasOwn(next.documents[0], key));
+  for (const key of ["species", "birthDate"])
+    assert.ok(
+      !Object.hasOwn(next.profile, key) &&
+        !Object.hasOwn(next.documents[0].animal!, key),
+    );
+  for (const key of ["startDate", "endDate", "action", "instructions"])
+    assert.ok(!Object.hasOwn(next.documents[0].items[0], key));
+  const context = briefingContext(next);
+  assert.ok(!Object.hasOwn(context.records[0], "time"));
+  assert.ok(!Object.hasOwn(context.pet, "birthDate"));
+  assert.deepEqual(migrateStore(migrated), migrated);
 });
+
 test("a briefing context includes older conditions and only the selected dog records", async () => {
   let s = ingestDocument(emptyHousehold(), doc());
   s = ingestDocument(s, doc("other-dog", "콩이"));
@@ -195,10 +218,10 @@ test("old browser records migrate once with stable identity, images and dose che
   await db.put("files", new Blob(["legacy image"]), "legacy");
   const first = await readState();
   const second = await readState();
-  assert.equal(first.version, 2);
+  assert.equal(first.version, 3);
   assert.equal(first.pets[0].id, second.pets[0].id);
   assert.equal(first.pets[0].checks["legacy-dose"], "2026-11-07T08:00:00Z");
   assert.equal(await (await readFile("legacy"))?.text(), "legacy image");
-  assert.equal((await db.get("state", "current")).version, 2);
+  assert.equal((await db.get("state", "current")).version, 3);
   db.close();
 });
