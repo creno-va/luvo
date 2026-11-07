@@ -8,6 +8,7 @@ import {
   type AnimalInfo,
   type DocumentRecord,
 } from "./domain.ts";
+import { compareDocuments } from "./chronology.ts";
 
 export type Household = {
   version: 2;
@@ -25,7 +26,8 @@ export function activePet(store: Household): AppState | undefined {
 export function migrateStore(value: unknown): Household {
   if (!value) return emptyHousehold();
   const stored = value as Household | AppState;
-  if (stored.version === 2 && Array.isArray(stored.pets)) return stored;
+  if (stored.version === 2 && Array.isArray(stored.pets))
+    return { ...stored, pets: stored.pets.map(restoreClinicalDates) };
   if (stored.version === 1 && Array.isArray(stored.documents)) {
     if (
       !stored.documents.length &&
@@ -39,11 +41,33 @@ export function migrateStore(value: unknown): Household {
       id: stored.id || crypto.randomUUID(),
       revision: stored.revision ?? 0,
     };
-    return { version: 2, activePetId: pet.id, pets: [pet] };
+    return {
+      version: 2,
+      activePetId: pet.id,
+      pets: [restoreClinicalDates(pet)],
+    };
   }
   throw new Error(
     "저장된 기록 형식을 확인하지 못했어요. 기존 기록은 지우지 않았어요.",
   );
+}
+function restoreClinicalDates(pet: AppState): AppState {
+  return {
+    ...pet,
+    medications: pet.medications.map((med) => ({
+      ...med,
+      revisions: med.revisions.map((revision) => {
+        const doc = pet.documents.find((d) => d.id === revision.documentId);
+        return doc
+          ? {
+              ...revision,
+              documentDate: doc.date,
+              documentTime: doc.time || "",
+            }
+          : revision;
+      }),
+    })),
+  };
 }
 const normalize = (value: string) =>
   value.normalize("NFKC").replace(/\s/g, "").toLocaleLowerCase();
@@ -139,11 +163,9 @@ export function replacePet(
   };
 }
 export function briefingContext(pet: AppState, date = localDate()) {
-  const documents = pet.documents.toSorted((a, b) =>
-    b.date.localeCompare(a.date),
-  );
+  const documents = pet.documents.toSorted(compareDocuments);
   return {
-    analysisVersion: 5,
+    analysisVersion: 6,
     pet: {
       name: pet.profile.name,
       breed: pet.profile.breed || "",
@@ -151,11 +173,13 @@ export function briefingContext(pet: AppState, date = localDate()) {
       age: pet.profile.age || "",
       birthDate: pet.profile.birthDate || "",
       profileAsOf: pet.profile.asOf || "",
+      profileAsOfTime: pet.profile.asOfTime || "",
     },
     asOf: date,
     records: documents.map((d) => ({
       id: d.id,
       date: d.date,
+      time: d.time || "",
       diagnosis: d.diagnosis,
       summary: d.summary,
       conditions: d.conditions ?? [],

@@ -1,3 +1,5 @@
+import { documentMoment } from "./chronology.ts";
+
 export type PrescriptionItem = {
   name: string;
   dose: string;
@@ -10,7 +12,12 @@ export type PrescriptionItem = {
 export type Medication = {
   id: string;
   name: string;
-  revisions: (PrescriptionItem & { documentId: string; recordedAt: string })[];
+  revisions: (PrescriptionItem & {
+    documentId: string;
+    recordedAt: string;
+    documentDate?: string;
+    documentTime?: string;
+  })[];
   pauses: { id: string; start: string; end: string | null }[];
 };
 export type DocumentRecord = {
@@ -18,6 +25,7 @@ export type DocumentRecord = {
   fingerprint: string;
   filename: string;
   date: string;
+  time?: string;
   clinic: string;
   diagnosis: string;
   summary: string;
@@ -75,6 +83,7 @@ export type AppState = {
     age?: string;
     birthDate?: string;
     asOf?: string;
+    asOfTime?: string;
   };
   medications: Medication[];
   documents: DocumentRecord[];
@@ -98,6 +107,7 @@ export type AppState = {
 export type Extraction = {
   clinic: string;
   date: string;
+  time?: string;
   diagnosis: string;
   summary: string;
   medications: PrescriptionItem[];
@@ -142,7 +152,16 @@ export function revisionAt(med: Medication, date: string) {
     .toSorted(
       (a, b) =>
         b.startDate.localeCompare(a.startDate) ||
-        b.recordedAt.localeCompare(a.recordedAt),
+        documentMoment({
+          date: b.documentDate || b.startDate,
+          time: b.documentTime,
+        }).localeCompare(
+          documentMoment({
+            date: a.documentDate || a.startDate,
+            time: a.documentTime,
+          }),
+        ) ||
+        a.documentId.localeCompare(b.documentId),
     )[0];
 }
 export function isPrescribed(med: Medication, date: string): boolean {
@@ -299,6 +318,10 @@ export function applyPrescription(
     throw new Error("이미 등록한 문서예요. 진료 기록에서 확인할 수 있어요.");
   const error = validateItems(doc.items);
   if (error) throw new Error(error);
+  if (!isDate(doc.date))
+    throw new Error("서류에 적힌 진료 날짜를 확인해 주세요.");
+  if (doc.time && !isTime(doc.time))
+    throw new Error("서류에 적힌 진료 시간을 확인해 주세요.");
   if (!doc.items.length && !doc.diagnosis.trim() && !doc.animal?.name)
     throw new Error("약이 없는 진단서는 진료 내용을 입력해 주세요.");
   const medications = structuredClone(state.medications);
@@ -312,6 +335,8 @@ export function applyPrescription(
       times: [...new Set(item.times)].sort(),
       documentId: doc.id,
       recordedAt: doc.createdAt,
+      documentDate: doc.date,
+      documentTime: doc.time || "",
     };
     if (existing) existing.revisions.push(revision);
     else
@@ -326,13 +351,20 @@ export function applyPrescription(
     ...state,
     revision: state.revision + 1,
     profile:
-      doc.animal && (!state.profile.asOf || doc.date >= state.profile.asOf)
+      doc.animal &&
+      (!state.profile.asOf ||
+        documentMoment(doc) >
+          documentMoment({
+            date: state.profile.asOf,
+            time: state.profile.asOfTime,
+          }))
         ? {
             ...state.profile,
             ...Object.fromEntries(
               Object.entries(doc.animal).filter(([, value]) => value.trim()),
             ),
             asOf: doc.date,
+            asOfTime: doc.time || "",
             detail: profileDetail({
               ...state.profile,
               ...Object.fromEntries(
@@ -346,7 +378,7 @@ export function applyPrescription(
     activities: [
       {
         id: uid(),
-        at: doc.createdAt,
+        at: documentMoment(doc),
         type: "document",
         title: `${doc.clinic || "병원"} 진료 기록을 추가했어요`,
         detail: `${doc.items.length}개의 약 · ${doc.date}`,

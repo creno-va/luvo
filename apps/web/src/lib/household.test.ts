@@ -10,6 +10,7 @@ import {
   briefingContext,
   replacePet,
   contextHash,
+  migrateStore,
 } from "./household.ts";
 import {
   emptyState,
@@ -118,6 +119,41 @@ test("late historical documents do not regress age or other newer profile inform
   const b = ingestDocument(a, old);
   assert.equal(activePet(b)?.profile.age, "7세");
   assert.equal(activePet(b)?.documents.length, 2);
+});
+
+test("same-day dog metadata and briefing records follow document time rather than upload time", () => {
+  const later = { ...doc("later"), time: "18:00" };
+  later.animal!.age = "7세";
+  const earlier = {
+    ...doc("earlier"),
+    time: "09:00",
+    createdAt: "2026-11-20T00:00:00Z",
+    animal: { ...patient(), age: "6세" },
+  };
+  const pet = activePet(
+    ingestDocument(ingestDocument(emptyHousehold(), later), earlier),
+  )!;
+  assert.equal(pet.profile.age, "7세");
+  const context = briefingContext(pet);
+  assert.deepEqual(
+    context.records.map((r) => r.time),
+    ["18:00", "09:00"],
+  );
+  assert.ok(!JSON.stringify(context.records).includes("2026-11-20"));
+  const legacy = structuredClone(pet);
+  for (const revision of legacy.medications[0].revisions) {
+    delete revision.documentDate;
+    delete revision.documentTime;
+  }
+  const migrated = migrateStore({
+    version: 2,
+    activePetId: legacy.id,
+    pets: [legacy],
+  });
+  assert.equal(
+    migrated.pets[0].medications[0].revisions[0].documentTime,
+    "18:00",
+  );
 });
 test("a briefing context includes older conditions and only the selected dog records", async () => {
   let s = ingestDocument(emptyHousehold(), doc());

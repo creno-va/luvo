@@ -46,6 +46,26 @@ test("newer explicit status does not erase older unrelated conditions", () => {
   assert.match(facts.summary, /의심 소견/);
   assert.match(facts.summary, /승모판/);
 });
+
+test("the latest clinical clock time wins even when an older visit was uploaded afterward", () => {
+  const facts = groundedFacts({
+    ...context,
+    records: [
+      { ...context.records[0], id: "morning", time: "09:00" },
+      {
+        ...context.records[0],
+        id: "evening",
+        time: "18:00",
+        conditions: [
+          { name: "만성 신장질환", status: "suspected", note: "재확인" },
+        ],
+      },
+    ],
+  });
+  assert.match(facts.current[0].text, /18:00/);
+  assert.match(facts.current[0].text, /의심 소견/);
+  assert.deepEqual(facts.current[0].sourceIds, ["evening"]);
+});
 test("medical watches require the disease and an actual source record", () => {
   const item = {
     sourceIds: ["r1"],

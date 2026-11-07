@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  timelineEntries,
+  compareDocuments,
+  documentDateLabel,
+} from "./chronology.ts";
+import {
   applyPrescription,
   doseKey,
   emptyState,
@@ -49,6 +54,70 @@ test("an earlier prescription uploaded later does not replace the current prescr
   assert.equal(s.medications.length, 1);
   assert.equal(revisionAt(s.medications[0], date)?.dose, "2정");
   assert.equal(revisionAt(s.medications[0], "2026-11-03")?.dose, "1정");
+});
+
+test("same-day clinical times determine document, prescription and timeline order despite reverse uploads", () => {
+  const morning = {
+    ...document("morning", date, "1정"),
+    time: "09:30",
+    createdAt: "2026-11-20T00:00:00Z",
+  };
+  const evening = {
+    ...document("evening", date, "2정"),
+    time: "18:00",
+    createdAt: "2026-11-10T00:00:00Z",
+  };
+  let s = applyPrescription(emptyState(), evening);
+  s = applyPrescription(s, morning);
+  assert.equal(revisionAt(s.medications[0], date)?.dose, "2정");
+  assert.deepEqual(
+    s.documents.toSorted(compareDocuments).map((d) => d.id),
+    ["evening", "morning"],
+  );
+  assert.deepEqual(
+    timelineEntries(s).map((e) => e.at),
+    [`${date}T18:00`, `${date}T09:30`],
+  );
+  assert.equal(s.documents[0].createdAt, morning.createdAt);
+});
+
+test("date-only records never become upload time or an invented midnight and legacy activities are derived from documents", () => {
+  const old = {
+    ...document("old", "2024-03-02"),
+    createdAt: "2026-11-07T12:30:00Z",
+  };
+  const s = applyPrescription(emptyState(), old);
+  s.activities[0].at = old.createdAt;
+  const entry = timelineEntries(s)[0];
+  assert.equal(entry.at, "2024-03-02");
+  assert.equal(entry.dateOnly, true);
+  assert.match(documentDateLabel(old), /시간 미기재/);
+  assert.equal(timelineEntries({ ...s, activities: [] }).length, 1);
+});
+
+test("manual pause and actual dose-check times remain actual action timestamps", () => {
+  let s = applyPrescription(emptyState(), { ...document(), time: "07:00" });
+  const id = s.medications[0].id;
+  s = toggleCheck(s, doseKey(id, date, "08:00"), localISO("08:03"));
+  s = toggleMedication(s, id, localISO("09:00"));
+  const entries = timelineEntries(s);
+  assert.deepEqual(
+    entries.map((e) => e.type),
+    ["pause", "check", "document"],
+  );
+  assert.equal(entries[0].at, localISO("09:00"));
+  assert.equal(entries[1].at, localISO("08:03"));
+});
+
+test("invalid document date or time is rejected instead of using upload time", () => {
+  assert.throws(
+    () => applyPrescription(emptyState(), { ...document(), date: "" }),
+    /진료 날짜/,
+  );
+  assert.throws(
+    () => applyPrescription(emptyState(), { ...document(), time: "25:00" }),
+    /진료 시간/,
+  );
 });
 test("pause and resume record an interval and preserve the prescription", () => {
   let s = applyPrescription(emptyState(), document());

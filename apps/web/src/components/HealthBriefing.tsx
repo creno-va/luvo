@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { briefingContext, contextHash } from "@/lib/household";
+import { compareDocuments, documentDateLabel } from "@/lib/chronology";
 import {
   localDate,
   type AppState,
@@ -127,7 +128,8 @@ export function HealthBriefingPanel({
         return doc ? (
           <button key={id} onClick={() => onDocument(doc)}>
             <FileText size={12} />
-            {doc.date.slice(5).replace("-", "/")} 진료 기록
+            {doc.date.slice(5).replace("-", "/")}
+            {doc.time ? ` ${doc.time}` : ""} 진료 기록
           </button>
         ) : null;
       })}
@@ -308,7 +310,7 @@ export function MedicalHistory({
 }) {
   const records = pet.documents
     .filter((d) => d.diagnosis || d.conditions?.length)
-    .toSorted((a, b) => b.date.localeCompare(a.date));
+    .toSorted(compareDocuments);
   return (
     <section className="medical-history">
       <div className="section-heading">
@@ -322,7 +324,7 @@ export function MedicalHistory({
             className="medical-event"
             onClick={() => onDocument(doc)}
           >
-            <span className="medical-event-date">{doc.date}</span>
+            <span className="medical-event-date">{documentDateLabel(doc)}</span>
             <div>
               {doc.conditions?.length ? (
                 <div className="condition-tags">

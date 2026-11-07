@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import {
   emptyState,
   isDate,
+  isTime,
   isPrescribed,
   localDate,
   revisionAt,
@@ -79,6 +80,11 @@ import {
   useHealthAnalysis,
 } from "./HealthBriefing";
 import { DocumentOnboarding } from "./DocumentOnboarding";
+import {
+  compareDocuments,
+  documentDateLabel,
+  timelineEntries,
+} from "@/lib/chronology";
 
 type Tab = "today" | "medications" | "records" | "health";
 type Draft = {
@@ -113,7 +119,7 @@ const blankItem = (): PrescriptionItem => ({
   name: "",
   dose: "",
   times: ["08:00", "20:00"],
-  startDate: localDate(),
+  startDate: "",
   endDate: "",
   instructions: "",
   action: "prescribe",
@@ -1133,7 +1139,7 @@ export default function LuvoApp() {
                       </div>
                       <div className="document-list">
                         {state.documents
-                          .toSorted((a, b) => b.date.localeCompare(a.date))
+                          .toSorted(compareDocuments)
                           .map((doc) => (
                             <button
                               key={doc.id}
@@ -1145,7 +1151,7 @@ export default function LuvoApp() {
                               </span>
                               <div>
                                 <span className="document-meta">
-                                  {shortDate(doc.date)}
+                                  {documentDateLabel(doc)}
                                   {doc.sample && <em>샘플</em>}
                                 </span>
                                 <h3>{doc.clinic || "병원 진료 기록"}</h3>
@@ -1164,49 +1170,33 @@ export default function LuvoApp() {
                         <h2>함께 쌓인 기록</h2>
                       </div>
                       <div className="activity-list">
-                        {[
-                          ...state.activities.map((a) => ({
-                            id: a.id,
-                            at: a.at,
-                            title: a.title,
-                            detail: a.detail,
-                            type: a.type,
-                          })),
-                          ...Object.entries(state.checks).map(([key, at]) => {
-                            const [id, day, time] = key.split("|");
-                            return {
-                              id: key,
-                              at,
-                              title: `${state.medications.find((m) => m.id === id)?.name ?? "처방약"} 투약했어요`,
-                              detail: `${shortDate(day)} ${timeLabel(time)} 일정`,
-                              type: "check",
-                            };
-                          }),
-                        ]
-                          .toSorted((a, b) => b.at.localeCompare(a.at))
-                          .map((event) => (
-                            <div className="activity-row" key={event.id}>
-                              <span
-                                className={cn(
-                                  "activity-dot",
-                                  event.type === "check" && "blue",
-                                )}
-                              >
-                                {event.type === "check" ? (
-                                  <Check size={15} />
-                                ) : event.type === "pause" ? (
-                                  <Pause size={13} />
-                                ) : (
-                                  <FileText size={14} />
-                                )}
-                              </span>
-                              <div>
-                                <strong>{event.title}</strong>
-                                <p>{event.detail}</p>
-                              </div>
-                              <time>{dateTime(event.at)}</time>
+                        {timelineEntries(state).map((event) => (
+                          <div className="activity-row" key={event.id}>
+                            <span
+                              className={cn(
+                                "activity-dot",
+                                event.type === "check" && "blue",
+                              )}
+                            >
+                              {event.type === "check" ? (
+                                <Check size={15} />
+                              ) : event.type === "pause" ? (
+                                <Pause size={13} />
+                              ) : (
+                                <FileText size={14} />
+                              )}
+                            </span>
+                            <div>
+                              <strong>{event.title}</strong>
+                              <p>{event.detail}</p>
                             </div>
-                          ))}
+                            <time>
+                              {event.type === "document"
+                                ? `${event.at.replace("T", " ")}${event.dateOnly ? " · 시간 미기재" : ""}`
+                                : dateTime(event.at)}
+                            </time>
+                          </div>
+                        ))}
                       </div>
                     </>
                   ) : (
@@ -1431,7 +1421,7 @@ export default function LuvoApp() {
                 {document.clinic || "병원 진료 기록"}
               </DialogTitle>
               <DialogDescription className="modal-description">
-                {shortDate(document.date)} · {document.items.length}개의 약
+                {documentDateLabel(document)} · {document.items.length}개의 약
               </DialogDescription>
               {document.diagnosis && (
                 <div className="diagnosis-note">
@@ -1732,7 +1722,8 @@ function UploadDialog({
       if (
         !extraction.warnings.length &&
         !validateItems(extraction.medications) &&
-        isDate(extraction.date)
+        isDate(extraction.date) &&
+        (!extraction.time || isTime(extraction.time))
       ) {
         const result = await onSaved(next, makeDocument(next));
         if (id !== operation.current) return;
@@ -1747,7 +1738,8 @@ function UploadDialog({
       setDraft({
         extraction: {
           clinic: "",
-          date: localDate(),
+          date: "",
+          time: "",
           diagnosis: "",
           summary: "",
           medications: [blankItem()],
@@ -1774,6 +1766,7 @@ function UploadDialog({
       filename: value.file.name,
       clinic: value.extraction.clinic.trim(),
       date: value.extraction.date,
+      time: value.extraction.time || "",
       diagnosis: value.extraction.diagnosis,
       summary: value.manual ? "" : value.extraction.summary,
       items: value.extraction.medications,
@@ -1808,8 +1801,12 @@ function UploadDialog({
       return;
     }
     const issue = validateItems(draft.extraction.medications);
-    if (issue || !isDate(draft.extraction.date)) {
-      setError(issue || "문서 날짜를 확인해 주세요.");
+    if (
+      issue ||
+      !isDate(draft.extraction.date) ||
+      (draft.extraction.time && !isTime(draft.extraction.time))
+    ) {
+      setError(issue || "서류에 적힌 진료 날짜·시간을 확인해 주세요.");
       return;
     }
     setError("");
@@ -2109,12 +2106,21 @@ function UploadDialog({
                 />
               </label>
               <label>
-                문서 날짜
+                서류에 적힌 진료 날짜
                 <Input
                   type="date"
                   value={draft.extraction.date}
                   onChange={(e) => updateExtraction({ date: e.target.value })}
                 />
+              </label>
+              <label>
+                서류에 적힌 진료 시간 · 선택
+                <Input
+                  type="time"
+                  value={draft.extraction.time || ""}
+                  onChange={(e) => updateExtraction({ time: e.target.value })}
+                />
+                <small>시간이 없으면 비워두세요. 날짜만 기록해요.</small>
               </label>
             </div>
             <label className="field-label">
