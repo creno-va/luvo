@@ -24,10 +24,9 @@ test("preparation remains useful without AI results or a confirmed diagnosis", (
   const cards = carePlan(pet, "2026-11-07");
   assert.deepEqual(
     cards.map((c) => c.id),
-    ["daily", "home", "visit", "emergency"],
+    ["daily"],
   );
   assert.match(cards[0].reason, /직접 입력/);
-  assert.match(cards.at(-1)!.reason, /현재 발생했다는 뜻은 아니/);
   for (const card of cards) {
     assert.ok(card.actions.length >= 2);
     assert.ok(card.referenceIds.every((id) => careReferences[id]));
@@ -101,4 +100,16 @@ test("one dog never inherits another dog topics or record IDs and samples do not
   );
   first.sample = true;
   assert.deepEqual(carePlan(first, "2026-11-07"), []);
+});
+
+test("respiratory and digestive notes produce different actions without generic diet cards", () => {
+  const pet = emptyState();
+  pet.documents = [record("cough", "기침과 콧물, 식욕은 평소와 같음")];
+  const respiratory = carePlan(pet, "2026-11-07");
+  assert.match(respiratory[0].actions.join(" "), /편안한 공간에서 쉬/);
+  assert.ok(!respiratory.some((c) => c.id === "home"));
+  pet.documents = [record("stomach", "구토와 설사")];
+  const digestive = carePlan(pet, "2026-11-07");
+  assert.match(digestive[0].actions.join(" "), /토한 내용물/);
+  assert.ok(!digestive[0].actions.join(" ").includes("다른 강아지"));
 });

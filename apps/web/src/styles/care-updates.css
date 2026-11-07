@@ -326,3 +326,40 @@
     transition: none;
   }
 }
+
+.personal-care-list {
+  margin: 20px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 22px;
+}
+.personal-care-list > li {
+  padding-left: 4px;
+}
+.personal-care-list strong {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.personal-care-list p {
+  margin: 6px 0;
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.personal-care-list small {
+  display: block;
+  color: #777b76;
+  line-height: 1.7;
+  font-size: 12px;
+}
+.personal-care-list .personal-care-contact {
+  font-size: 13px;
+  color: #795846;
+}
+.personal-care-list .care-guidance-sources {
+  margin-top: 8px;
+}
+.personal-care-list .reference-row {
+  margin-top: 6px;
+  flex-wrap: wrap;
+}

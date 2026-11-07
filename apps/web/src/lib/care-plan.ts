@@ -1,6 +1,10 @@
 import { isPrescribed, localDate, type AppState } from "./domain.ts";
 
 export const careReferences = {
+  respiratory: {
+    title: "AVMA · 기침과 호흡기 증상 관리",
+    url: "https://avma.org/resources-tools/pet-owners/petcare/canine-infectious-respiratory-disease-complex-kennel-cough",
+  },
   routine: {
     title: "Merck · 반려견 건강 관찰과 생활 관리",
     url: "https://www.merckvetmanual.com/dog-owners/routine-care-of-dogs/routine-health-care-of-dogs",
@@ -88,7 +92,10 @@ export function carePlan(pet: AppState, date = localDate()): CareCard[] {
       sourceIds: digestive.slice(0, 3).map((d) => d.id),
       referenceIds: ["vomiting"],
     });
-  const breathing = topic(/기침|호흡|심장|승모판|cough|breath|heart|mitral/i);
+  const respiratory = topic(/기침|콧물|감기|기관지|cough|nasal|bronch/i);
+  const breathing = topic(
+    /기침|콧물|감기|기관지|호흡|심장|승모판|cough|breath|heart|mitral/i,
+  );
   if (breathing.length)
     cards.push({
       id: "breathing",
@@ -96,13 +103,19 @@ export function carePlan(pet: AppState, date = localDate()): CareCard[] {
       title: "기침·호흡이 평소와 다른지 살펴요",
       reason: why(breathing),
       actions: [
-        "기침이 생기는 상황과 활동량의 변화를 메모하고, 증상이 보이면 가능한 범위에서 영상을 남겨요.",
-        "이전 검사 결과와 현재 약 목록을 함께 준비해 담당 병원에 변화를 설명해요.",
+        respiratory.length
+          ? "기침·콧물이 이어지면 조용하고 편안한 공간에서 쉬게 하고, 흥분하거나 무리한 활동은 피하게 해요."
+          : "기침이 생기는 상황과 쉬고 있을 때의 호흡 변화를 메모하고, 증상이 보이면 영상을 남겨요.",
+        respiratory.length
+          ? "기침 시작 시점·횟수와 호흡 모습을 남겨요. 다른 강아지와의 만남은 미루고, 병원 방문 전 기침 증상을 알려주세요."
+          : "이전 심장·호흡 검사 결과와 현재 약 목록을 준비해 담당 병원에 달라진 점을 설명해요.",
       ],
       contact:
         "지금 호흡이 힘들거나 의식이 떨어지면 관찰을 이어가기보다 즉시 응급 동물병원에 연락해요.",
       sourceIds: breathing.slice(0, 3).map((d) => d.id),
-      referenceIds: ["routine", "emergency"],
+      referenceIds: respiratory.length
+        ? ["respiratory", "emergency"]
+        : ["routine", "emergency"],
     });
   const skin = topic(/피부|가려|긁|skin|itch/i);
   const mobility = topic(/관절|절뚝|다리|보행|joint|limp/i);
@@ -236,5 +249,10 @@ export function carePlan(pet: AppState, date = localDate()): CareCard[] {
     sourceIds: [],
     referenceIds: ["emergency"],
   });
-  return cards;
+  const specific = cards.filter(
+    (c) => !["daily", "home", "visit", "emergency"].includes(c.id),
+  );
+  return specific.length
+    ? specific.slice(0, 4)
+    : cards.filter((c) => c.id === "daily");
 }

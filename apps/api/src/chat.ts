@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { parseAiResponse } from "./ai-response";
-import { logAiFailure } from "./ai-diagnostics";
+import { parseAiResponse } from "./ai-response.ts";
+import { logAiFailure } from "./ai-diagnostics.ts";
 import {
   chatInput,
   chatInstruction,
@@ -9,7 +9,7 @@ import {
   isCurrentEmergency,
   emergencyReply,
   allowedChatOrigin,
-} from "./chat-policy";
+} from "./chat-policy.ts";
 
 export const chat = new Hono<{
   Bindings: ApiBindings & { ALLOW_LOCAL_CHAT?: string };
@@ -57,39 +57,53 @@ chat.post("/", async (c) => {
     );
   let stage: "inference" | "decode" | "validation" = "inference";
   try {
-    const [first, ...rest] = input.messages;
-    const result = await c.env.AI.run(
-      "@cf/meta/llama-4-scout-17b-16e-instruct",
-      {
-        messages: [
-          { role: "system", content: chatInstruction },
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await c.env.AI.run(
+          "@cf/meta/llama-4-scout-17b-16e-instruct",
           {
-            role: "user",
-            content: JSON.stringify({
-              context: input.context,
-              question: first.content,
-            }),
+            messages: [
+              { role: "system", content: chatInstruction },
+              {
+                role: "user",
+                content: JSON.stringify({
+                  context: input.context,
+                  conversation: input.messages.slice(0, -1),
+                  question: input.messages.at(-1)!.content,
+                  ...(attempt
+                    ? {
+                        reminder:
+                          "Return complete JSON with answer, recordIds, referenceIds, followUps, urgent. Use only supplied IDs. No medication changes.",
+                      }
+                    : {}),
+                }),
+              },
+            ],
+            max_tokens: 1800,
+            temperature: 0.2,
+            response_format: { type: "json_object" },
           },
-          ...rest,
-        ],
-        max_tokens: 1800,
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-      },
-      {
-        signal: AbortSignal.timeout(50000),
-        gateway: {
-          id: c.env.AI_GATEWAY_ID,
-          skipCache: true,
-          collectLog: false,
-          requestTimeoutMs: 45000,
-        },
-      },
-    );
-    stage = "decode";
-    const decoded = parseAiResponse(result);
-    stage = "validation";
-    return c.json(checkedReply(decoded, input));
+          {
+            signal: AbortSignal.timeout(22000),
+            gateway: {
+              id: c.env.AI_GATEWAY_ID,
+              skipCache: true,
+              collectLog: false,
+              requestTimeoutMs: 20000,
+            },
+          },
+        );
+        stage = "decode";
+        const decoded = parseAiResponse(result);
+        stage = "validation";
+        return c.json(checkedReply(decoded, input));
+      } catch (error) {
+        if (attempt === 1) throw error;
+        logAiFailure("chat", stage, error);
+        stage = "inference";
+      }
+    }
+    throw new Error("Chat attempts exhausted");
   } catch (error) {
     logAiFailure("chat", stage, error);
     return c.json(
