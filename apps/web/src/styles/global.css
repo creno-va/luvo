@@ -712,23 +712,6 @@ img {
   margin-top: 5px;
   line-height: 1.7;
 }
-.med-card [role="switch"] {
-  height: 25px;
-  width: 43px;
-  background: #e2e8dc;
-}
-.med-card [role="switch"][data-state="checked"] {
-  background: var(--accent);
-}
-.med-card [role="switch"] > span {
-  height: 19px;
-  width: 19px;
-}
-.med-card [role="switch"][data-state="checked"] > span {
-  background: #1b3523;
-  transform: translateX(17px);
-  translate: 0 0;
-}
 .med-schedule {
   display: flex;
   flex-wrap: wrap;

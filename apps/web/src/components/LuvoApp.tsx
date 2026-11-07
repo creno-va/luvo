@@ -7,8 +7,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   Dog,
   FileText,
@@ -37,13 +35,13 @@ import { DocumentOnboarding } from "./DocumentOnboarding";
 import { useHealthAnalysis } from "./HealthBriefing";
 import { MedicationResearch } from "./MedicationResearch";
 import { DogChat } from "./DogChat";
+import { CarePreparation } from "./CarePreparation";
+import { medicationList } from "@/lib/medication-list";
 import {
   emptyState,
   isPrescribed,
   localDate,
   revisionAt,
-  sampleState,
-  scheduleFor,
   toggleCheck,
   toggleMedication,
   type AppState,
@@ -51,7 +49,6 @@ import {
   type HealthBriefing,
 } from "@/lib/domain";
 import {
-  activePet,
   briefingContext,
   ingestDocument,
   replacePet,
@@ -76,12 +73,6 @@ const researchTarget = () => {
   const query = new URLSearchParams(location.search);
   return { petId: query.get("pet"), medId: query.get("med") };
 };
-const readableDate = (date: string) =>
-  new Date(`${date}T12:00:00`).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 const clock = (at: string) =>
   new Date(at).toLocaleString("ko-KR", {
     month: "numeric",
@@ -96,7 +87,6 @@ export default function LuvoApp() {
   const [view, setView] = useState<View>(viewFromUrl);
   const [research, setResearch] = useState(researchTarget);
   const [date, setDate] = useState(localDate());
-  const [calendar, setCalendar] = useState(false);
   const [upload, setUpload] = useState(false);
   const [document, setDocument] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState("");
@@ -107,9 +97,21 @@ export default function LuvoApp() {
   } | null>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const channel = useRef<BroadcastChannel | null>(null);
-  const pet = store ? (activePet(store) ?? null) : null;
+  const pets = store?.pets.filter((p) => !p.sample) ?? [];
+  const pet = pets.find((p) => p.id === store?.activePetId) ?? pets[0] ?? null;
   const empty = useRef(emptyState()).current;
   const analysis = useHealthAnalysis(pet, commitBriefing);
+  useEffect(() => {
+    const update = () => setDate(localDate());
+    const timer = window.setInterval(update, 60000);
+    window.addEventListener("focus", update);
+    window.document.addEventListener("visibilitychange", update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", update);
+      window.document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
   useEffect(() => {
     const load = () =>
       readState()
@@ -255,19 +257,6 @@ export default function LuvoApp() {
     }
     return { ok };
   }
-  async function installSample() {
-    const sample = sampleState();
-    if (
-      await persist((s) =>
-        s.pets.length
-          ? s
-          : { version: 3, activePetId: sample.id, pets: [sample] },
-      )
-    ) {
-      navigate("home");
-      setToast("가상의 샘플이에요. 투약 체크를 직접 해보세요.");
-    }
-  }
   if (fatal)
     return (
       <main className="boot-screen">
@@ -286,7 +275,7 @@ export default function LuvoApp() {
     );
   if (view === "chat") {
     const owner = research.petId
-      ? store.pets.find((p) => p.id === research.petId)
+      ? pets.find((p) => p.id === research.petId)
       : pet;
     return (
       <div className="care-app">
@@ -313,7 +302,7 @@ export default function LuvoApp() {
     );
   }
   if (view === "medication") {
-    const owner = store.pets.find((p) => p.id === research.petId);
+    const owner = pets.find((p) => p.id === research.petId);
     const med = owner?.medications.find((m) => m.id === research.medId);
     const plan = med && (revisionAt(med, date) ?? med.revisions.at(-1));
     return (
@@ -339,10 +328,7 @@ export default function LuvoApp() {
   return (
     <div className="care-app">
       {!pet || view === "welcome" ? (
-        <DocumentOnboarding
-          onUpload={() => setUpload(true)}
-          onSample={() => void installSample()}
-        />
+        <DocumentOnboarding onUpload={() => setUpload(true)} />
       ) : (
         <>
           <div className="desktop-masthead">
@@ -359,28 +345,6 @@ export default function LuvoApp() {
               <>
                 <header className="care-header">
                   <button
-                    className="date-trigger"
-                    onClick={() => setCalendar(true)}
-                    aria-label={`날짜 선택, ${readableDate(date)}`}
-                  >
-                    <span className="eyebrow">
-                      {date === localDate() ? "TODAY" : "CARE LOG"}{" "}
-                      <ChevronDown size={13} />
-                    </span>
-                    <strong>
-                      {new Date(`${date}T12:00:00`).toLocaleDateString(
-                        "ko-KR",
-                        { month: "long", day: "numeric" },
-                      )}
-                      <em>
-                        {new Date(`${date}T12:00:00`).toLocaleDateString(
-                          "ko-KR",
-                          { weekday: "short" },
-                        )}
-                      </em>
-                    </strong>
-                  </button>
-                  <button
                     className="dog-trigger"
                     onClick={() => navigate("dogs")}
                     aria-label={`강아지 선택, ${pet.profile.name}`}
@@ -392,20 +356,6 @@ export default function LuvoApp() {
                     <ChevronDown size={16} />
                   </button>
                 </header>
-                {date !== localDate() && (
-                  <p className="past-date-note">
-                    투약은 선택한 날짜, 브리핑은 최신 기록 기준으로 보여드려요.
-                  </p>
-                )}
-                {pet.sample && (
-                  <div className="sample-notice">
-                    <Sparkles size={14} />
-                    <span>샘플 기록이에요. 자유롭게 눌러보세요.</span>
-                    <button onClick={() => setUpload(true)}>
-                      내 기록 시작 <ArrowUpRight size={14} />
-                    </button>
-                  </div>
-                )}
                 <div className="home-grid">
                   <div className="brief-column">
                     <Briefing
@@ -419,6 +369,7 @@ export default function LuvoApp() {
                   </div>
                   <div className="daily-column">
                     <MedicationList
+                      key={pet.id}
                       pet={pet}
                       date={date}
                       saving={saving}
@@ -472,7 +423,7 @@ export default function LuvoApp() {
                   아이를 선택하면 그 아이의 기록으로 이동해요.
                 </p>
                 <div className="dog-list">
-                  {store.pets.map((p, index) => (
+                  {pets.map((p, index) => (
                     <button
                       className={`dog-profile ${pet.id === p.id ? "selected" : ""}`}
                       key={p.id}
@@ -590,19 +541,9 @@ export default function LuvoApp() {
         open={upload}
         onOpenChange={setUpload}
         state={pet ?? empty}
-        pets={store.pets}
+        pets={pets}
         saving={saving}
         onSaved={saveDocument}
-      />
-      <CalendarSheet
-        open={calendar}
-        onOpenChange={setCalendar}
-        value={date}
-        pet={pet}
-        onSelect={(d) => {
-          setDate(d);
-          setCalendar(false);
-        }}
       />
       <DocumentSheet document={document} onClose={() => setDocument(null)} />
       {undo && !upload && (
@@ -687,7 +628,8 @@ function Briefing({
           onClick={() => onDocument(d)}
         >
           <FileText size={12} />
-          {d.date.slice(5).replace("-", ".")} 진료 기록{" "}
+          {d.date.slice(5).replace("-", ".")}{" "}
+          {d.source === "manual" ? "직접 입력" : "진료 기록"}{" "}
           <ArrowUpRight size={12} />
         </button>
       ));
@@ -781,63 +723,52 @@ function Briefing({
           </div>
         </details>
       ) : null}
-      <div className="section-top watch-heading">
-        <h2>다음 변화를 위한 준비</h2>
-        <span className="tiny-pill">확인할 가능성</span>
-      </div>
-      {pet.sample ? (
-        <div className="watch-empty">
-          <span className="watch-icon">
-            <Activity size={22} />
-          </span>
-          <h3>우리 아이의 다음도 함께.</h3>
-          <p>
-            이전 병력과 새 기록을 연결해, 관찰할 변화와 준비할 일을 짧게
-            알려드려요.
-          </p>
-          <span className="small-note">
-            실제 문서를 올리면 분석이 시작돼요.
-          </span>
-        </div>
-      ) : brief?.watch.length ? (
-        brief.watch.map((item, index) => (
-          <article className="watch-item" key={index}>
-            <span className="watch-index">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <div>
-              <h3>{item.title}</h3>
-              <p>{item.possibility}</p>
-              <div className="preparation">
-                <ArrowDownLeft size={16} />
-                <div>
-                  <strong>이렇게 준비해요</strong>
-                  <p>{item.prepare}</p>
+      <CarePreparation
+        key={pet.id}
+        pet={pet}
+        date={analysis.day}
+        onDocument={onDocument}
+      />
+      {!!brief?.watch.length && (
+        <details className="consult-details clinical-watch">
+          <summary>
+            병력에서 살펴볼 변화 <Plus size={16} />
+          </summary>
+          {brief.watch.map((item, index) => (
+            <article className="watch-item" key={index}>
+              <span className="watch-index">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.possibility}</p>
+                <div className="preparation">
+                  <ArrowDownLeft size={16} />
+                  <div>
+                    <strong>이렇게 준비해요</strong>
+                    <p>{item.prepare}</p>
+                  </div>
+                </div>
+                <div className="source-row">{source(item.sourceIds)}</div>
+                <div className="reference-row">
+                  {item.referenceIds.map((id) => {
+                    const ref = brief.references.find((r) => r.id === id);
+                    return ref ? (
+                      <a
+                        key={id}
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {ref.title} ↗
+                      </a>
+                    ) : null;
+                  })}
                 </div>
               </div>
-              <div className="source-row">{source(item.sourceIds)}</div>
-              <div className="reference-row">
-                {item.referenceIds.map((id) => {
-                  const ref = brief.references.find((r) => r.id === id);
-                  return ref ? (
-                    <a key={id} href={ref.url} target="_blank" rel="noreferrer">
-                      {ref.title} ↗
-                    </a>
-                  ) : null;
-                })}
-              </div>
-            </div>
-          </article>
-        ))
-      ) : (
-        <div className="watch-empty">
-          <Activity size={23} />
-          <p>
-            {analysis.loading
-              ? "병력 속 연결을 살피고 있어요."
-              : "현재 기록만으로 예상할 수 있는 구체적인 변화는 아직 없어요. 다음 진료 기록을 이어주세요."}
-          </p>
-        </div>
+            </article>
+          ))}
+        </details>
       )}
       {brief && (brief.questions.length > 0 || brief.unknowns.length > 0) && (
         <details className="consult-details">
@@ -874,12 +805,8 @@ function MedicationList({
   onCheck: (key: string) => Promise<void>;
   onResearch: (id: string) => void;
 }) {
-  const rows = scheduleFor(pet, date);
-  const medications = pet.medications.filter(
-    (m) =>
-      isPrescribed(m, date) ||
-      rows.some((r) => r.med.id === m.id && r.checkedAt),
-  );
+  const [todayOnly, setTodayOnly] = useState(true);
+  const { rows, medications } = medicationList(pet, date, todayOnly);
   const required = rows.filter((r) => !r.paused || r.checkedAt);
   const checked = required.filter((r) => r.checkedAt).length;
   return (
@@ -888,7 +815,7 @@ function MedicationList({
         <div>
           <span className="eyebrow">A LITTLE CARE</span>
           <h2>
-            {date === localDate() ? "오늘 챙길 약" : "이날의 투약 기록"}
+            {todayOnly ? "오늘 챙길 약" : "전체 약 기록"}
             <span className="count-label">{medications.length}</span>
           </h2>
         </div>
@@ -896,6 +823,14 @@ function MedicationList({
           <strong>{checked}</strong>
           <span>/ {required.length}</span>
         </span>
+      </div>
+      <div className="medication-view-filter">
+        <span id="today-medication-label">오늘 챙길 약만</span>
+        <Switch
+          checked={todayOnly}
+          onCheckedChange={setTodayOnly}
+          aria-labelledby="today-medication-label"
+        />
       </div>
       <div
         className="dose-progress"
@@ -913,8 +848,7 @@ function MedicationList({
       </div>
       <p className="dose-helper">약을 먹인 뒤, 해당 시간에 체크해 주세요.</p>
       {medications.length ? (
-        medications.map((med, index) => {
-          const plan = revisionAt(med, date)!;
+        medications.map(({ med, plan, prescribed, status }, index) => {
           const paused = med.pauses.some((p) => !p.end);
           const medRows = rows.filter((r) => r.med.id === med.id);
           return (
@@ -940,12 +874,14 @@ function MedicationList({
                   </div>
                   <p>{plan.dose}</p>
                 </div>
-                <Switch
-                  checked={!paused}
-                  disabled={saving}
-                  onCheckedChange={() => void onToggle(med.id)}
-                  aria-label={`${med.name} 복용 중`}
-                />
+                {prescribed && (
+                  <Switch
+                    checked={!paused}
+                    disabled={saving}
+                    onCheckedChange={() => void onToggle(med.id)}
+                    aria-label={`${med.name} 복용 중`}
+                  />
+                )}
               </div>
               <div className="med-schedule">
                 {medRows.map((row) => (
@@ -978,9 +914,13 @@ function MedicationList({
                     ? plan.endDate.slice(5).replace("-", ".")
                     : "종료일 미기재"}
                 </span>
-                <span className={paused ? "paused-label" : "taking-label"}>
+                <span
+                  className={
+                    !prescribed || paused ? "paused-label" : "taking-label"
+                  }
+                >
                   <i />
-                  {paused ? "복용 쉬는 중" : "복용 중"}
+                  {status}
                 </span>
               </div>
             </article>
@@ -989,10 +929,11 @@ function MedicationList({
       ) : (
         <div className="med-empty">
           <Pill size={27} />
-          <h3>이날의 처방약이 없어요</h3>
+          <h3>{todayOnly ? "오늘의 처방약이 없어요" : "등록한 약이 없어요"}</h3>
           <p>
-            처방 기간이 시작되면 이곳에 나타나요.
-            <br />새 처방을 받았다면 건강 기록을 추가해 주세요.
+            {todayOnly
+              ? "전체 약 기록에서 이전 처방도 확인할 수 있어요."
+              : "새 처방을 받았다면 건강 기록을 추가해 주세요."}
           </p>
         </div>
       )}
@@ -1120,139 +1061,6 @@ function HealthPeriods({ pet }: { pet: AppState }) {
   );
 }
 
-function CalendarSheet({
-  open,
-  onOpenChange,
-  value,
-  onSelect,
-  pet,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  value: string;
-  onSelect: (v: string) => void;
-  pet: AppState | null;
-}) {
-  const [month, setMonth] = useState(value.slice(0, 7));
-  const [selected, setSelected] = useState(value);
-  useEffect(() => {
-    if (open) {
-      setMonth(value.slice(0, 7));
-      setSelected(value);
-    }
-  }, [open, value]);
-  const [year, m] = month.split("-").map(Number);
-  const first = new Date(year, m - 1, 1);
-  const days = new Date(year, m, 0).getDate();
-  const shift = (n: number) => {
-    const next = new Date(year, m - 1 + n, 1);
-    setMonth(
-      `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`,
-    );
-  };
-  const visitDates = new Set(pet?.documents.map((d) => d.date));
-  const doseDates = new Set(
-    Object.keys(pet?.checks ?? {}).map((key) => key.split("|")[1]),
-  );
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent variant="sheet" className="bottom-sheet calendar-sheet">
-        <div className="sheet-handle" />
-        <DialogTitle className="sheet-title">어느 날을 볼까요?</DialogTitle>
-        <DialogDescription className="sheet-description">
-          날짜를 골라 그날의 투약 기록을 확인해요.
-        </DialogDescription>
-        <div className="calendar-month">
-          <button
-            className="icon-button"
-            aria-label="이전 달"
-            onClick={() => shift(-1)}
-          >
-            <ChevronLeft size={22} />
-          </button>
-          <strong>
-            {year}년 {m}월
-          </strong>
-          <button
-            className="icon-button"
-            aria-label="다음 달"
-            onClick={() => shift(1)}
-          >
-            <ChevronRight size={22} />
-          </button>
-        </div>
-        <div className="calendar-grid">
-          <div className="weekdays">
-            {"일월화수목금토".split("").map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="calendar-days">
-            {Array.from({ length: first.getDay() }, (_, i) => (
-              <span key={`blank${i}`} />
-            ))}
-            {Array.from({ length: days }, (_, i) => {
-              const day = `${month}-${String(i + 1).padStart(2, "0")}`;
-              return (
-                <button
-                  className={`${day === selected ? "selected" : ""} ${day === localDate() ? "today" : ""}`}
-                  key={day}
-                  onClick={() => setSelected(day)}
-                  aria-label={`${day} 선택`}
-                  aria-pressed={day === selected}
-                >
-                  {i + 1}
-                  <span className="calendar-dots">
-                    {visitDates.has(day) && <i />}
-                    {doseDates.has(day) && <i className="dose-dot" />}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="calendar-legend">
-          <span>
-            <i />
-            진료 기록
-          </span>
-          <span>
-            <i />
-            투약 체크
-          </span>
-          <button
-            onClick={() => {
-              setSelected(localDate());
-              setMonth(localDate().slice(0, 7));
-            }}
-          >
-            오늘로
-          </button>
-        </div>
-        <label className="calendar-direct">
-          날짜 직접 선택
-          <input
-            type="date"
-            value={selected}
-            onChange={(e) => {
-              if (e.target.value) {
-                setSelected(e.target.value);
-                setMonth(e.target.value.slice(0, 7));
-              }
-            }}
-          />
-        </label>
-        <Button
-          className="sheet-confirm"
-          size="lg"
-          onClick={() => onSelect(selected)}
-        >
-          이 날짜 보기 <ArrowRight size={18} />
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
-}
 function DocumentSheet({
   document: doc,
   onClose,

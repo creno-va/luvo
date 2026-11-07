@@ -10,22 +10,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
-export function DocumentOnboarding({
-  onUpload,
-  onSample,
-}: {
-  onUpload: () => void;
-  onSample: () => void;
-}) {
+export function DocumentOnboarding({ onUpload }: { onUpload: () => void }) {
   return (
     <main className="landing">
       <header className="landing-header">
         <a className="wordmark" href="/">
           luvo<span>•</span>
         </a>
-        <button onClick={onSample}>
-          먼저 둘러보기 <ArrowUpRight size={16} />
-        </button>
       </header>
       <aside className="landing-demo" aria-label="AI 시연 안내">
         <span className="landing-demo-icon" aria-hidden="true">

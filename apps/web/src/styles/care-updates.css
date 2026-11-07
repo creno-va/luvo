@@ -1,0 +1,231 @@
+.care-header {
+  justify-content: flex-end;
+}
+.luvo-switch {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #dce4d6;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 0.18s;
+}
+.luvo-switch[data-state="checked"] {
+  background: var(--accent);
+}
+.luvo-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #182b1726;
+  pointer-events: none;
+  transform: translateX(0);
+  transition:
+    transform 0.18s,
+    background-color 0.18s;
+}
+.luvo-switch[data-state="checked"] > .luvo-switch-thumb {
+  transform: translateX(18px);
+  background: #173923;
+}
+.luvo-switch:focus-visible {
+  outline: 3px solid #83b989;
+  outline-offset: 3px;
+}
+.luvo-switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.medication-view-filter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 15px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #e0e6da;
+  border-radius: 12px;
+  background: #fbfcf8;
+  font-size: 12px;
+  color: #617555;
+}
+.care-preparation-intro {
+  color: #7e8a73;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: -2px 0 18px;
+}
+.care-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 17px;
+}
+.care-filters button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 35px;
+  padding: 7px 11px;
+  border: 1px solid #dce4d4;
+  border-radius: 20px;
+  background: #fafbf7;
+  color: #728266;
+  font-size: 11px;
+}
+.care-filters button[aria-pressed="true"] {
+  background: #203b29;
+  border-color: #203b29;
+  color: #fff;
+}
+.care-filters button span {
+  opacity: 0.65;
+  font-size: 10px;
+}
+.care-guidance-list {
+  display: grid;
+  gap: 12px;
+}
+.care-guidance {
+  display: flex;
+  gap: 12px;
+  padding: 19px 18px;
+  border: 1px solid #dde5d5;
+  border-radius: 17px;
+  background: #fbfcf8;
+}
+.care-guidance-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  background: #edf4e7;
+  border-radius: 11px;
+  color: #607c4e;
+}
+.care-guidance-body {
+  min-width: 0;
+  flex: 1;
+}
+.care-guidance-category {
+  color: #7a9269;
+  font-size: 10px;
+  font-weight: 600;
+}
+.care-guidance h3 {
+  margin: 5px 0 9px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #30452d;
+  letter-spacing: -0.03em;
+}
+.care-guidance-reason {
+  margin: 0 0 12px;
+  color: #85917b;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.care-guidance ul {
+  list-style: disc;
+  padding-left: 16px;
+  margin: 0;
+  color: #5c7050;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.care-guidance li + li {
+  margin-top: 7px;
+}
+.care-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 13px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #eef3e7;
+  color: #5b714d;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.care-contact svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.care-guidance-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+}
+.care-guidance-sources:empty {
+  display: none;
+}
+.care-guidance-sources button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #dce6d3;
+  border-radius: 7px;
+  padding: 5px 7px;
+  color: #728763;
+  background: #f2f6ed;
+  font-size: 10px;
+}
+.care-guidance .reference-row {
+  margin-top: 10px;
+}
+.care-guidance-emergency {
+  border-color: #e7d4aa;
+  background: #fffbf2;
+}
+.care-guidance-emergency .care-guidance-icon {
+  background: #f6ecd5;
+  color: #987637;
+}
+.care-guidance-emergency h3 {
+  color: #7c612e;
+}
+.clinical-watch {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .care-header {
+    margin-bottom: 22px;
+  }
+  .care-guidance {
+    padding: 16px 14px;
+    gap: 9px;
+  }
+  .care-guidance-icon {
+    flex-basis: 29px;
+    height: 29px;
+    border-radius: 9px;
+  }
+  .care-guidance h3 {
+    font-size: 13px;
+  }
+  .care-filters {
+    gap: 5px;
+  }
+  .care-filters button {
+    padding-inline: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .luvo-switch,
+  .luvo-switch-thumb {
+    transition: none;
+  }
+}

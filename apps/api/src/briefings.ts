@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { logAiFailure } from "./ai-diagnostics";
 import { parseAiResponse } from "./ai-response";
+import { allowedChatOrigin } from "./chat-policy";
 import {
   groundedFacts,
   supportedWatch,
@@ -119,7 +120,9 @@ The server already builds current facts from the chart; do NOT generate a curren
 Every watch item must cite sourceIds that exist in input records. Watch items are CONDITIONAL possibilities, not diagnosed conditions or predictions. Each must also be specifically supported by supplied clinical guide facts and cite the guide ID. A 'history' label never means improved/resolved; do not claim recovery unless the record explicitly says it. Do not introduce unrelated diseases. For example low glucose may be discussed only for documented insulin-treated diabetes. Never present a statistical probability, a guaranteed prognosis, or a diagnosis based only on breed/age. If evidence is insufficient, omit watch items and explain the missing facts under unknowns.
 Preparation may suggest keeping observations, bringing records to the veterinarian, and confirming an existing follow-up plan. Do not give new treatment, diet, supplement, exercise, or medication adjustment instructions. Do not manufacture tests or daily observations. Clearly distinguish chart facts from future possibilities. Keep at most 3 watch items and 3 questions. Calm, short, specific Korean; no long disclaimer. Do not output Markdown.`;
 
-export const briefings = new Hono<{ Bindings: ApiBindings }>();
+export const briefings = new Hono<{
+  Bindings: ApiBindings & { ALLOW_LOCAL_CHAT?: string };
+}>();
 briefings.use(
   "*",
   bodyLimit({
@@ -134,11 +137,7 @@ briefings.use(
 briefings.post("/analyze", async (c) => {
   c.header("Cache-Control", "no-store");
   const origin = c.req.header("Origin");
-  const url = new URL(c.req.url);
-  const local =
-    ["localhost", "127.0.0.1"].includes(url.hostname) &&
-    ["http://localhost:4321", "http://127.0.0.1:4321"].includes(origin ?? "");
-  if (origin && origin !== url.origin && !local)
+  if (!allowedChatOrigin(origin, c.req.url, c.env.ALLOW_LOCAL_CHAT === "true"))
     return c.json({ error: "이 페이지에서 다시 확인해 주세요." }, 403);
   if (
     !(
@@ -171,6 +170,7 @@ briefings.post("/analyze", async (c) => {
         ],
         temperature: 0,
         max_tokens: 2600,
+        response_format: { type: "json_object" },
       },
       {
         signal: AbortSignal.timeout(60000),
