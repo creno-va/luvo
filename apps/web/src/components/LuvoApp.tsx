@@ -15,6 +15,7 @@ import {
   Heart,
   LoaderCircle,
   Pill,
+  MessageCircle,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -35,6 +36,7 @@ import { DocumentUpload, type Draft } from "./DocumentUpload";
 import { DocumentOnboarding } from "./DocumentOnboarding";
 import { useHealthAnalysis } from "./HealthBriefing";
 import { MedicationResearch } from "./MedicationResearch";
+import { DogChat } from "./DogChat";
 import {
   emptyState,
   isPrescribed,
@@ -59,13 +61,14 @@ import { readFile, readState, writeState } from "@/lib/storage";
 import { documentDateLabel, timelineEntries } from "@/lib/chronology";
 import { healthPeriods } from "@/lib/periods";
 
-type View = "home" | "dogs" | "timeline" | "welcome" | "medication";
+type View = "home" | "dogs" | "timeline" | "welcome" | "medication" | "chat";
 const viewFromUrl = (): View => {
   const v = new URLSearchParams(location.search).get("view");
   return v === "dogs" ||
     v === "timeline" ||
     v === "welcome" ||
-    v === "medication"
+    v === "medication" ||
+    v === "chat"
     ? v
     : "home";
 };
@@ -148,7 +151,10 @@ export default function LuvoApp() {
     const url = new URL(location.href);
     if (next === "home") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
-    if (next === "medication" && medId && pet) {
+    if (next === "chat" && pet) {
+      url.searchParams.set("pet", pet.id);
+      url.searchParams.delete("med");
+    } else if (next === "medication" && medId && pet) {
       url.searchParams.set("med", medId);
       url.searchParams.set("pet", pet.id);
     } else {
@@ -278,6 +284,34 @@ export default function LuvoApp() {
         <p>우리 아이의 기록을 준비하고 있어요</p>
       </main>
     );
+  if (view === "chat") {
+    const owner = research.petId
+      ? store.pets.find((p) => p.id === research.petId)
+      : pet;
+    return (
+      <div className="care-app">
+        {owner ? (
+          <DogChat
+            key={owner.id}
+            pet={owner}
+            onBack={back}
+            onRecord={(id) =>
+              setDocument(owner.documents.find((d) => d.id === id) || null)
+            }
+          />
+        ) : (
+          <main className="boot-screen">
+            <Dog size={30} />
+            <h1>질문할 강아지의 기록을 먼저 선택해 주세요</h1>
+            <Button onClick={() => navigate("home")}>
+              내 기록으로 돌아가기
+            </Button>
+          </main>
+        )}
+        <DocumentSheet document={document} onClose={() => setDocument(null)} />
+      </div>
+    );
+  }
   if (view === "medication") {
     const owner = store.pets.find((p) => p.id === research.petId);
     const med = owner?.medications.find((m) => m.id === research.medId);
@@ -530,14 +564,24 @@ export default function LuvoApp() {
                 <strong>오늘의 건강, 잊기 전에.</strong>
                 <small>사진이나 메모로 이어가요</small>
               </span>
-              <button
-                className="primary-action"
-                onClick={() => setUpload(true)}
-              >
-                <Plus size={21} />
-                <span>건강 기록 추가</span>
-                <ArrowUpRight size={20} />
-              </button>
+              <div className="dock-actions">
+                <button
+                  className="primary-action"
+                  onClick={() => setUpload(true)}
+                >
+                  <Plus size={21} />
+                  <span>건강 기록 추가</span>
+                  <ArrowUpRight size={20} />
+                </button>
+                <button
+                  className="chat-dock-action"
+                  onClick={() => navigate("chat")}
+                >
+                  <MessageCircle size={21} />
+                  <span>질문하기</span>
+                  <ArrowUpRight size={18} />
+                </button>
+              </div>
             </div>
           </div>
         </>

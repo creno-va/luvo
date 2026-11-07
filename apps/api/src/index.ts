@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { prescriptions } from './prescriptions';
 import { briefings } from './briefings';
 import { medications } from './medications';
+import { chat } from './chat';
 
 const app = new Hono<{ Bindings: ApiBindings }>();
 
@@ -11,6 +12,7 @@ app.use('*', secureHeaders());
 app.route('/api/prescriptions', prescriptions);
 app.route('/api/briefings', briefings);
 app.route('/api/medications', medications);
+app.route('/api/chat', chat);
 
 app.get('/api', (c) => c.json({ name: 'luvo-api', version: '0.0.0' }));
 

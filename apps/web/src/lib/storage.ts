@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from "idb";
 import { migrateStore, type Household } from "./household.ts";
+import { compactConversation, type ChatMessage } from "./chat.ts";
 
 let connection: Promise<IDBPDatabase> | undefined;
 function db() {
@@ -35,6 +36,17 @@ export async function writeState(
 }
 export async function readFile(id: string): Promise<Blob | undefined> {
   return (await db()).get("files", id);
+}
+export async function readConversation(petId: string): Promise<ChatMessage[]> {
+  return compactConversation(await (await db()).get("state", `chat:${petId}`));
+}
+export async function writeConversation(
+  petId: string,
+  messages: ChatMessage[],
+) {
+  await (
+    await db()
+  ).put("state", compactConversation(messages), `chat:${petId}`);
 }
 export async function fingerprint(file: File): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());

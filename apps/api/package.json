@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --test src/briefing-facts.test.ts src/document-extraction.test.ts src/ai-diagnostics.test.ts src/ai-response.test.ts src/medication-research.test.ts",
+    "test": "node --experimental-strip-types --test src/briefing-facts.test.ts src/document-extraction.test.ts src/ai-diagnostics.test.ts src/ai-response.test.ts src/medication-research.test.ts src/chat-policy.test.ts",
     "check": "tsc --project tsconfig.json",
     "cf:typegen": "npx wrangler types worker-configuration.d.ts --env-interface ApiBindings",
     "deploy": "npx wrangler deploy"
