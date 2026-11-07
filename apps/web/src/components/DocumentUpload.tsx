@@ -323,6 +323,7 @@ export function DocumentUpload({
       }}
     >
       <DialogContent
+        variant="sheet"
         className={cn("upload-dialog", step === "review" && "review-dialog")}
       >
         <div className="modal-icon">

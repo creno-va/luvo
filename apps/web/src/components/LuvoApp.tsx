@@ -1055,7 +1055,7 @@ function CalendarSheet({
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bottom-sheet calendar-sheet">
+      <DialogContent variant="sheet" className="bottom-sheet calendar-sheet">
         <div className="sheet-handle" />
         <DialogTitle className="sheet-title">어느 날을 볼까요?</DialogTitle>
         <DialogDescription className="sheet-description">
@@ -1188,7 +1188,7 @@ function DocumentSheet({
         if (!v) onClose();
       }}
     >
-      <DialogContent className="bottom-sheet document-sheet">
+      <DialogContent variant="sheet" className="bottom-sheet document-sheet">
         <div className="sheet-handle" />
         <DialogTitle className="sheet-title">
           {doc?.clinic || "진료 기록"}

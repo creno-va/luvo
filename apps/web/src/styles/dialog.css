@@ -1,0 +1,145 @@
+.luvo-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(10 20 15 / 38%);
+  backdrop-filter: blur(3px);
+}
+
+.luvo-dialog-viewport {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) 16px
+    max(16px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.luvo-dialog-viewport[data-variant="sheet"] {
+  align-items: flex-end;
+  padding: max(12px, env(safe-area-inset-top))
+    env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* Keep positioning on the viewport, never mix centering translations with
+   bottom anchoring. Specificity also isolates the old screen-specific CSS. */
+.luvo-dialog-viewport > .dialog-content[data-variant] {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  translate: none;
+  transform: none;
+  border-radius: 28px;
+  background: #fff;
+  pointer-events: auto;
+  outline: none;
+  animation: none;
+}
+
+.luvo-dialog-viewport > .dialog-content[data-variant="sheet"] {
+  max-width: 620px;
+  border-bottom: 0;
+  border-radius: 26px 26px 0 0;
+}
+
+.luvo-dialog-viewport > .dialog-content[data-variant="sheet"][data-state="open"] {
+  animation: luvo-sheet-enter 180ms ease-out;
+}
+
+.luvo-dialog-viewport .dialog-scroll {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 24px;
+  scrollbar-width: thin;
+}
+
+.luvo-dialog-viewport[data-variant="sheet"] .dialog-scroll {
+  padding: 14px 23px calc(24px + env(safe-area-inset-bottom));
+}
+
+.luvo-dialog-viewport .dialog-scroll > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.luvo-dialog-viewport .dialog-scroll > .sheet-handle {
+  display: none;
+}
+
+.dialog-sheet-grip {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 24px;
+  border-radius: 10px;
+  background: #dfe7d6;
+}
+
+.luvo-dialog-viewport .dialog-scroll > :is(.sheet-title, .modal-title) {
+  padding-right: 44px;
+}
+
+.luvo-dialog-viewport > .dialog-content > .dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #64745c;
+  background: #f0f3ea;
+}
+
+.luvo-dialog-viewport .dialog-close:hover {
+  background: #e3ebdc;
+}
+
+.luvo-dialog-viewport .dialog-close:focus-visible {
+  outline: 2px solid #009a55;
+  outline-offset: -3px;
+}
+
+@media (min-width: 768px) {
+  .luvo-dialog-viewport[data-variant="sheet"] .dialog-scroll {
+    padding: 16px 29px calc(30px + env(safe-area-inset-bottom));
+  }
+}
+
+@keyframes luvo-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luvo-dialog-viewport > .dialog-content[data-variant][data-state] {
+    animation: none;
+  }
+}
