@@ -17,6 +17,7 @@
     "dev:api": "npx wrangler dev --config apps/api/wrangler.jsonc --port 8787 --persist-to .wrangler/state",
     "build": "npm run build --workspace @luvo/web",
     "smoke": "node scripts/smoke.mjs",
+    "ai:setup": "node scripts/ai-setup.mjs",
     "cf:typegen": "npm run cf:typegen --workspaces --if-present",
     "check": "npm run cf:typegen && npm run check --workspaces --if-present",
     "preview": "npm run build && npx wrangler dev --config apps/web/wrangler.jsonc --config apps/api/wrangler.jsonc --port 4321 --persist-to .wrangler/state",

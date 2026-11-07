@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
+import { logAiFailure } from "./ai-diagnostics";
+import { parseAiResponse } from "./ai-response";
 
 const itemSchema = z.object({
   name: z.string().max(100),
@@ -103,6 +105,7 @@ prescriptions.post("/analyze", async (c) => {
       { error: "사진 형식을 확인하지 못했어요. 다른 사진을 골라주세요." },
       400,
     );
+  let stage: "inference" | "decode" | "validation" = "inference";
   try {
     let binary = "";
     for (let i = 0; i < bytes.length; i += 8192)
@@ -139,11 +142,10 @@ prescriptions.post("/analyze", async (c) => {
         },
       },
     );
-    const raw = "response" in result ? result.response : undefined;
-    if (typeof raw !== "string") throw new Error("Invalid model response");
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No structured response");
-    const extraction = extractionSchema.parse(JSON.parse(match[0]));
+    stage = "decode";
+    const parsed = parseAiResponse(result);
+    stage = "validation";
+    const extraction = extractionSchema.parse(parsed);
     for (const item of extraction.medications) {
       if (
         !item.name ||
@@ -160,8 +162,9 @@ prescriptions.post("/analyze", async (c) => {
       extraction.warnings.push("문서의 강아지 이름을 확인해 주세요.");
     extraction.warnings = [...new Set(extraction.warnings)].slice(0, 20);
     return c.json(extraction);
-  } catch {
+  } catch (error) {
     // Never log source images, extracted health information, or model payloads.
+    logAiFailure("prescription", stage, error);
     return c.json({ error: "자동 분석을 완료하지 못했어요." }, 502);
   }
 });
