@@ -19,7 +19,7 @@ export function timelineEntries(state: AppState) {
     sortAt: documentMoment(doc),
     dateOnly: !doc.time,
     type: "document" as const,
-    title: `${doc.clinic || "병원"} 진료 기록`,
+    title: `${doc.clinic || "병원"} ${doc.kind === "diagnosis" ? "진단서" : doc.kind === "prescription" ? "처방전" : "진료 기록"}`,
     detail: `${doc.items.length}개의 약 · 서류에 적힌 진료일 기준`,
     documentId: doc.id,
   }));

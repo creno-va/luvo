@@ -9,8 +9,10 @@
 - 근거: 현재 상태는 진료 문서 링크를, 미래의 확인할 변화는 문서와 지정된 수의학 참고 지침 링크를 함께 표시합니다. 확진·예측 확률·처방 변경 지시는 제공하지 않습니다.
 - 기존 기록: 브라우저 단일 강아지 기록을 여러 강아지 구조로 자동 이전하며 원본 사진과 투약 체크를 보존합니다.
 - 진료 타임라인: 업로드 시간이 아닌 서류에 적힌 진료 날짜·시간으로 정렬합니다. 시간이 없으면 날짜만 기록하고 ‘시간 미기재’로 표시하며, 날짜가 불명확하면 확인받습니다. 업로드 시각은 원본 정보로만 따로 보관합니다.
-- UI: Astro + React, Pretendard 자체 호스팅, Lucide, shadcn 패턴의 Radix UI 컴포넌트와 Tailwind CSS.
-- 레이아웃: 데스크톱은 왼쪽 탐색·오늘 투약·약 요약, 모바일은 하단 탐색과 한 열의 체크 목록.
+- UI: Astro + React, 형광 초록색 primary, Paperlogy(날짜·제목·주요 수치) + Pretendard(본문) 자체 호스팅, Lucide, shadcn 패턴의 Radix UI 컴포넌트와 Tailwind CSS.
+- 레이아웃: 모바일은 브리핑 → 예상 변화·대응 → 약별 토글·투약 체크 → 최근 타임라인 순서의 한 화면입니다. 날짜는 캘린더 바텀시트, 강아지 목록과 전체 타임라인은 URL과 뒤로 가기를 지원하는 별도 화면입니다. 데스크톱에서는 브리핑과 투약·최근 기록을 두 열로 배치합니다.
+- 업로드: 하단 고정 버튼 → 처방전·진단서 개별 사진 슬롯 → 한 번에 정리. 체크박스 없이 분석 안내를 표시하며, 두 문서는 차례로 분석·저장합니다. 한 문서 저장 후 다음 문서에서 실패해도 저장된 기록은 남습니다.
+- 기간: 전체 타임라인에서 문서상 병력 기록 범위, 처방 변경별 기간, 겹치는 복용 쉼 기간을 구분합니다. 실제 발병일이나 복용 사실을 추정하지 않습니다.
 - 사진: JPG/PNG/WebP, 원본 최대 12MB. 분석용으로 크기를 조정하여 Hono API → Cloudflare AI Gateway → Workers AI로 전송합니다.
 - 읽힌 처방이 명확하면 자동 반영하고, 불명확한 날짜·용량·투약 시간은 확인받습니다. 분석 실패 시 원본과 함께 직접 입력할 수 있습니다.
 - 샘플과 실제 기록은 섞지 않습니다. 첫 실제 문서 등록 시 샘플을 정리합니다.
@@ -130,7 +132,11 @@ npm run smoke
 `/api/health/db`는 Drizzle로 실제 D1 테이블을 조회하며 DB 또는 마이그레이션에 문제가 있으면 503을 반환합니다.
 건강 기록은 D1·R2에 저장하지 않습니다. D1은 기존 연결 확인용으로 유지합니다.
 AI는 `apps/api/wrangler.jsonc`의 AI 바인딩과 `AI_GATEWAY_ID`(현재 `default`)를 사용합니다.
+Workers AI가 JSON을 문자열 또는 이미 파싱된 객체로 반환하는 경우를 모두 처리하며, 결과는 기능별 Zod 스키마로 검증합니다.
+`npm run ai:setup`으로 Wrangler 로그인에 연결된 원격 AI 바인딩을 통해 실제 추론을 검증합니다. `default` Gateway가 없으면 첫 인증 요청에서 자동 생성됩니다. 별도 공급자 API 키나 Gateway 관리용 토큰은 필요하지 않습니다.
+이 명령은 짧은 테스트 문장만 전송하며 캐시·Gateway 로그 수집을 끕니다. [Cloudflare의 기본 Gateway 생성 동작](https://developers.cloudflare.com/ai-gateway/configuration/manage-gateway/)을 사용합니다.
 개발 중에도 사진 분석은 원격 Workers AI를 호출하므로 Wrangler 로그인이 필요합니다.
 분석 요청은 Gateway 캐시와 로그 수집을 끄며, API는 사진·추출 결과를 로그로 남기지 않습니다.
+분석 실패 시에는 기능명과 실패 단계(`inference`, `decode`, `validation`, `grounding`), 시간 초과 여부, 숫자 HTTP 상태만 기록합니다. `npx wrangler tail --config apps/api/wrangler.jsonc`으로 확인할 수 있으며 원문·모델 응답·오류 전문은 기록하지 않습니다.
 사진 분석은 IP별 분당 5회, 병력 브리핑은 분당 6회로 제한합니다. 모델 결과는 원본과 비교하여 수정할 수 있습니다.
 비밀값이 필요해지면 로컬은 `apps/api/.dev.vars`, 운영은 `npx wrangler secret put NAME --config apps/api/wrangler.jsonc`를 사용합니다.

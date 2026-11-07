@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { healthPeriods } from "./periods.ts";
 import {
   timelineEntries,
   compareDocuments,
@@ -225,4 +226,36 @@ test("completed doses remain visible when a later prescription removes their tim
   assert.ok(rows[0].checkedAt);
   assert.equal(rows[0].revision.dose, "1회 1정");
   assert.equal(rows[1].time, "12:00");
+});
+
+test("illness periods describe documented observations without inventing onset or recovery", () => {
+  let s = applyPrescription(emptyState(), {
+    ...document("first-visit", "2026-11-01"),
+    conditions: [{ name: "질환 A", status: "diagnosed", note: "" }],
+  });
+  s = applyPrescription(s, {
+    ...document("resolved", "2026-11-07"),
+    conditions: [{ name: "질환 A", status: "resolved", note: "종료 기재" }],
+  });
+  const period = healthPeriods(s).find((p) => p.type === "condition")!;
+  assert.equal(period.start, "2026-11-01");
+  assert.equal(period.end, "2026-11-07");
+  assert.match(period.note, /발병일이 아닌/);
+  s = applyPrescription(s, {
+    ...document("unknown", "2026-11-08"),
+    conditions: [{ name: "질환 B", status: "history", note: "" }],
+  });
+  const unknown = healthPeriods(s).find((p) => p.name === "질환 B")!;
+  assert.equal(unknown.end, "");
+  assert.match(unknown.label, /미확인/);
+});
+test("medication periods split at prescription changes and retain pauses spanning a new prescription", () => {
+  let s = applyPrescription(emptyState(), document("first", "2026-11-01"));
+  s = toggleMedication(s, s.medications[0].id, "2026-11-02T09:00:00Z");
+  s = applyPrescription(s, document("changed", "2026-11-07", "2정"));
+  const periods = healthPeriods(s).filter((p) => p.type === "medication");
+  assert.equal(periods.length, 2);
+  assert.equal(periods[0].start, "2026-11-07");
+  assert.match(periods[0].note, /복용 쉼 2026-11-02 — 현재/);
+  assert.equal(periods[1].end, "2026-11-07");
 });

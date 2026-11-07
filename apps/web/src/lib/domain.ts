@@ -24,6 +24,7 @@ export type DocumentRecord = {
   id: string;
   fingerprint: string;
   filename: string;
+  kind?: "prescription" | "diagnosis";
   date: string;
   time?: string;
   clinic: string;
