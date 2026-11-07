@@ -1,6 +1,12 @@
 import { documentMoment } from "./chronology.ts";
 
 export type PrescriptionItem = {
+  ingredient?: string;
+  productName?: string;
+  frequency?: string;
+  durationDays?: string;
+  endDateDerived?: boolean;
+  totalQuantity?: string;
   name: string;
   dose: string;
   times: string[];
@@ -25,6 +31,11 @@ export type DocumentRecord = {
   fingerprint: string;
   filename: string;
   kind?: "prescription" | "diagnosis";
+  dateSource?: "clinical" | "issued" | "unknown";
+  issuedDate?: string;
+  onsetDate?: string;
+  prognosis?: string;
+  otherFindings?: string;
   date: string;
   time?: string;
   clinic: string;
@@ -37,6 +48,8 @@ export type DocumentRecord = {
   conditions?: ConditionEntry[];
 };
 export type AnimalInfo = {
+  species?: string;
+  weight?: string;
   name: string;
   breed: string;
   sex: string;
@@ -79,6 +92,8 @@ export type AppState = {
   profile: {
     name: string;
     detail: string;
+    species?: string;
+    weight?: string;
     breed?: string;
     sex?: string;
     age?: string;
@@ -106,6 +121,13 @@ export type AppState = {
   analysisConsent?: boolean;
 };
 export type Extraction = {
+  documentKind?: "prescription" | "diagnosis";
+  quality?: "filled" | "blank" | "partial" | "unreadable";
+  dateSource?: "clinical" | "issued" | "unknown";
+  issuedDate?: string;
+  onsetDate?: string;
+  prognosis?: string;
+  otherFindings?: string;
   clinic: string;
   date: string;
   time?: string;

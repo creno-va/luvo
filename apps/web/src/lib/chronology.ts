@@ -9,8 +9,10 @@ export const compareDocuments = (
 ) =>
   documentMoment(b).localeCompare(documentMoment(a)) ||
   a.id.localeCompare(b.id);
-export const documentDateLabel = (doc: Pick<DocumentRecord, "date" | "time">) =>
-  `${doc.date}${doc.time ? ` ${doc.time}` : " · 시간 미기재"}`;
+export const documentDateLabel = (
+  doc: Pick<DocumentRecord, "date" | "time" | "dateSource">,
+) =>
+  `${doc.date}${doc.time ? ` ${doc.time}` : " · 시간 미기재"}${doc.dateSource === "issued" ? " · 발급일 기준" : ""}`;
 
 export function timelineEntries(state: AppState) {
   const documents = state.documents.map((doc) => ({

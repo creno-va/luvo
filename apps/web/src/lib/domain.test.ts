@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { healthPeriods } from "./periods.ts";
 import {
+  durationEndDate,
+  preparePrescriptionReview,
+} from "./prescription-review.ts";
+import {
   timelineEntries,
   compareDocuments,
   documentDateLabel,
@@ -258,4 +262,28 @@ test("medication periods split at prescription changes and retain pauses spannin
   assert.equal(periods[0].start, "2026-11-07");
   assert.match(periods[0].note, /복용 쉼 2026-11-02 — 현재/);
   assert.equal(periods[1].end, "2026-11-07");
+});
+
+test("only an explicit course length and confirmed start date suggest a review end date", () => {
+  assert.equal(durationEndDate("2026-11-07", "7일"), "2026-11-13");
+  assert.equal(durationEndDate("2024-02-28", "3일"), "2024-03-01");
+  for (const duration of ["1일 2회", "14정", "0일", "유효기간 3일"])
+    assert.equal(durationEndDate("2026-11-07", duration), "");
+  assert.equal(durationEndDate("", "7일"), "");
+  const item = { ...document().items[0], durationDays: "7일", endDate: "" };
+  const draft = preparePrescriptionReview(item);
+  assert.equal(draft.endDate, "2026-11-13");
+  assert.equal(draft.endDateDerived, true);
+  assert.equal(
+    preparePrescriptionReview({ ...draft, startDate: "2026-11-08" }).endDate,
+    "2026-11-14",
+  );
+  assert.equal(
+    preparePrescriptionReview({
+      ...draft,
+      endDate: "2026-11-20",
+      endDateDerived: false,
+    }).endDate,
+    "2026-11-20",
+  );
 });

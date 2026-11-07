@@ -954,6 +954,7 @@ function Timeline({
                 <p>{doc?.diagnosis || event.detail}</p>
                 {doc && (
                   <div className="timeline-tags">
+                    {doc.dateSource === "issued" && <span>발급일 기준</span>}
                     {doc.conditions?.slice(0, 2).map((c, i) => (
                       <span key={i}>{c.name}</span>
                     ))}
@@ -1222,6 +1223,12 @@ function DocumentSheet({
                 ))}
               </div>
             ) : null}
+            {(doc.onsetDate || doc.prognosis || doc.otherFindings || doc.animal?.weight) && <dl className="document-detail-fields">
+              {doc.animal?.weight && <div><dt>문서상 체중</dt><dd>{doc.animal.weight}</dd></div>}
+              {doc.onsetDate && <div><dt>발병 연월일</dt><dd>{doc.onsetDate}</dd></div>}
+              {doc.prognosis && <div><dt>예후 소견</dt><dd>{doc.prognosis}</dd></div>}
+              {doc.otherFindings && <div><dt>그 밖의 사항</dt><dd>{doc.otherFindings}</dd></div>}
+            </dl>}
             <div className="document-prescriptions">
               {doc.items.map((item, i) => (
                 <div key={i}>
@@ -1233,6 +1240,7 @@ function DocumentSheet({
                         ? "문서상 중단"
                         : `${item.dose} · ${item.times.join(" / ")}`}
                     </p>
+                    {(item.frequency || item.durationDays || item.totalQuantity) && <small>원문 { [item.frequency, item.durationDays ? `처방일수 ${item.durationDays}` : "", item.totalQuantity ? `판매 수량 ${item.totalQuantity}` : ""].filter(Boolean).join(" · ") }</small>}
                     <small>
                       {item.startDate} — {item.endDate || "종료일 미기재"}
                     </small>
@@ -1256,7 +1264,7 @@ function DocumentSheet({
               </p>
             )}
             <p className="document-uploaded">
-              업로드 {clock(doc.createdAt)} · 타임라인은 서류의 진료 시각
+              업로드 {clock(doc.createdAt)} · 타임라인은 서류 기준일·시각
               기준이에요.
             </p>
           </>
