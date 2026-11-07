@@ -197,7 +197,7 @@ export function replacePet(
 export function briefingContext(pet: AppState, date = localDate()) {
   const documents = pet.documents.toSorted(compareDocuments);
   return {
-    analysisVersion: 8,
+    analysisVersion: 9,
     pet: {
       name: pet.profile.name,
       breed: pet.profile.breed || "",
@@ -209,6 +209,7 @@ export function briefingContext(pet: AppState, date = localDate()) {
     records: documents.map((d) => ({
       id: d.id,
       date: d.date,
+      source: d.source || "photo",
       diagnosis: d.diagnosis,
       summary: d.summary,
       conditions: d.conditions ?? [],

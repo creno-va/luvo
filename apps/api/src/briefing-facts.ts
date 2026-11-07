@@ -11,6 +11,7 @@ export type BriefContext = {
   records: {
     id: string;
     date: string;
+    source?: "photo" | "manual";
     diagnosis: string;
     summary?: string;
     conditions: Condition[];
@@ -41,6 +42,7 @@ function orderedRecords(context: BriefContext) {
 
 function dermatophytosisRecord(context: BriefContext) {
   for (const record of orderedRecords(context)) {
+    if (record.source === "manual") continue;
     const condition = record.conditions.find((c) =>
       dermatophytosisName.test(c.name.trim()),
     );
@@ -97,6 +99,7 @@ export function completeFollowUp(
   if (!questions.length) {
     for (const record of orderedRecords(context)) {
       for (const condition of record.conditions) {
+        if (record.source === "manual") continue;
         if (!isClinicalConditionName(condition.name)) continue;
         questions.push(
           `${record.date} 문서의 ${condition.name}(${statusLabel[condition.status]})에 대해 현재 경과와 기존 재진 계획에서 확인할 점은 무엇인가요?`,
@@ -127,6 +130,7 @@ export function groundedFacts(context: BriefContext) {
   }[] = [];
   for (const record of records)
     for (const condition of record.conditions) {
+      if (record.source === "manual") continue;
       if (!isClinicalConditionName(condition.name)) continue;
       const key = condition.name
         .normalize("NFKC")
@@ -143,6 +147,13 @@ export function groundedFacts(context: BriefContext) {
   }));
   const current = records
     .flatMap((record) => {
+      if (record.source === "manual")
+        return [
+          {
+            text: `${record.date} 보호자 직접 기록: ${(record.summary?.trim() || record.diagnosis.trim() || "관찰 내용이 기재되어 있지 않아요.").slice(0, 180)}`,
+            sourceIds: [record.id],
+          },
+        ];
       if (record.conditions.some((c) => isClinicalConditionName(c.name)))
         return conditionFacts.filter((fact) =>
           fact.sourceIds.includes(record.id),
@@ -166,10 +177,12 @@ export function groundedFacts(context: BriefContext) {
       (conditions.length > 3 ? ` 외 ${conditions.length - 3}개` : "") +
       "이 기록되어 있어요."
     : records[0]
-      ? `${records[0].date} 진료 내용이 기록되어 있어요. ${recordOverview(records[0])}`
+      ? records[0].source === "manual"
+        ? "보호자가 직접 남긴 건강 관찰과 메모를 보관하고 있어요."
+        : `${records[0].date} 진료 내용이 기록되어 있어요. ${recordOverview(records[0])}`
       : "아직 정리할 진료 기록이 없어요.";
   return {
-    summary: `${context.pet.name}의 문서에는 ${description} 현재 유효한 처방약은 ${context.currentMedications.length}개이고, 최근 확인된 투약 체크는 ${context.doseRecords.length}건이에요.`,
+    summary: `${context.pet.name}의 건강 기록에는 ${description} 현재 유효한 처방약은 ${context.currentMedications.length}개이고, 최근 확인된 투약 체크는 ${context.doseRecords.length}건이에요.`,
     current,
   };
 }
@@ -191,20 +204,24 @@ export function supportedWatch(
     item.referenceIds.some((id) => !clinicalGuides.some((g) => g.id === id))
   )
     return false;
-  const text = JSON.stringify(sources);
+  const clinicalSources = sources.filter(
+    (record) => record.source !== "manual",
+  );
+  if (!clinicalSources.length) return false;
+  const text = JSON.stringify(clinicalSources);
   const meds = JSON.stringify(context.currentMedications);
   if (/재발/.test((item.title || "") + item.possibility) && !/재발/.test(text))
     return false;
   for (const reference of item.referenceIds) {
     if (
       reference === "merck-dermatophytosis" &&
-      !dermatophytosisRecord({ ...context, records: sources })
+      !dermatophytosisRecord({ ...context, records: clinicalSources })
     )
       return false;
     if (
       reference === "aaha-senior" &&
       new Set(
-        sources.flatMap((r) =>
+        clinicalSources.flatMap((r) =>
           r.conditions
             .filter((c) => isClinicalConditionName(c.name))
             .map((c) => c.name),

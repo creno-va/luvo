@@ -189,7 +189,7 @@ test("a briefing context includes older conditions and only the selected dog rec
   const hash = await contextHash(context);
   assert.equal(hash, await contextHash(briefingContext(first, "2026-11-07")));
   // Refresh saved briefings that mislabeled non-disease records as history.
-  assert.notEqual(hash, await contextHash({ ...context, analysisVersion: 7 }));
+  assert.notEqual(hash, await contextHash({ ...context, analysisVersion: 8 }));
   assert.notEqual(
     hash,
     await contextHash(briefingContext(first, "2026-11-08")),
