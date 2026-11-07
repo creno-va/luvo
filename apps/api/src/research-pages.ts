@@ -10,10 +10,11 @@ export async function enrichSources(
     sources.slice(0, 3).map(async (source) => {
       try {
         let url = source.url;
+        const pageSignal = AbortSignal.any([signal, AbortSignal.timeout(5000)]);
         for (let redirects = 0; redirects <= 2; redirects++) {
           const response = await fetch(url, {
             redirect: "manual",
-            signal: AbortSignal.any([signal, AbortSignal.timeout(7000)]),
+            signal: pageSignal,
             headers: { Accept: "text/html" },
           });
           if (response.status >= 300 && response.status < 400) {
@@ -90,11 +91,15 @@ export async function enrichSources(
             .replace(/[\t ]+/g, " ")
             .replace(/\n\s*\n/g, "\n")
             .trim()
-            .slice(0, 14000);
+            .slice(0, 6000);
           return text.length > 400
             ? {
                 ...source,
-                description: `Search excerpt: ${source.description}\n\nFetched page text: ${text}`,
+                description:
+                  `Search excerpt: ${source.description}\n\nFetched page text: ${text}`.slice(
+                    0,
+                    9000,
+                  ),
                 evidenceKind: "page" as const,
               }
             : source;
